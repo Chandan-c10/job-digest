@@ -63,10 +63,13 @@ commented out. To activate it on your fork:
 3. Commit and push. It'll run on GitHub's infrastructure — no need for your
    own machine to be on.
 
-> **No server needed — no external service at all.** Everything — the
-> schedule, the run, and state between runs — happens inside GitHub Actions
-> on GitHub's free runners. There's no server to host or keep running, no
-> cron provider to sign up for, and nothing to pay for.
+> **No server needed — no external service at all.** GitHub Actions is a
+> free tool (unlimited minutes on public repos): once the schedule is
+> uncommented, GitHub itself wakes up a runner at `30 2 * * *` (08:00 IST /
+> 02:30 UTC) every day, checks out the repo, runs `python3 main.py` exactly
+> like the local test command above, and tears the runner down when it's
+> done. There's no server to host or keep running, no cron provider to sign
+> up for, and nothing to pay for.
 
 State (`seen_jobs.json`) persists between runs via `actions/cache`, not by
 committing it to the repo, so your job history doesn't clutter git log.
