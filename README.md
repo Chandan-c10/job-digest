@@ -50,9 +50,23 @@ commented out. To activate it on your fork:
    - `JOB_DIGEST_EMAIL`
    - `JOB_DIGEST_APP_PASSWORD`
    - `JOB_DIGEST_RECIPIENT` (optional, defaults to `JOB_DIGEST_EMAIL`)
+
+   Example:
+
+   | Secret name | Example value |
+   |---|---|
+   | `JOB_DIGEST_EMAIL` | `you@gmail.com` |
+   | `JOB_DIGEST_APP_PASSWORD` | `abcd efgh ijkl mnop` (16-char Gmail App Password, not your account password) |
+   | `JOB_DIGEST_RECIPIENT` | `you@gmail.com` (optional — omit to just send to `JOB_DIGEST_EMAIL`) |
+
 2. Uncomment the `schedule:` block in the workflow file.
 3. Commit and push. It'll run on GitHub's infrastructure — no need for your
    own machine to be on.
+
+> **No server needed — no external service at all.** Everything — the
+> schedule, the run, and state between runs — happens inside GitHub Actions
+> on GitHub's free runners. There's no server to host or keep running, no
+> cron provider to sign up for, and nothing to pay for.
 
 State (`seen_jobs.json`) persists between runs via `actions/cache`, not by
 committing it to the repo, so your job history doesn't clutter git log.
