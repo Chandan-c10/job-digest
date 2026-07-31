@@ -1,4 +1,4 @@
-# job-digest
+# Auto-Job-Hunting
 
 A small daily job-alert bot. It polls RemoteOK and We Work Remotely, filters
 postings against a skill list you define, drops roles above your experience
