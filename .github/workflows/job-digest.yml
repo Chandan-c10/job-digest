@@ -1,0 +1,34 @@
+name: Job Digest
+
+on:
+  # This template ships with the daily schedule disabled. After you fork
+  # this and add JOB_DIGEST_EMAIL / JOB_DIGEST_APP_PASSWORD / (optionally)
+  # JOB_DIGEST_RECIPIENT as repo secrets, uncomment the schedule block below.
+  # schedule:
+  #   - cron: "30 2 * * *"  # 08:00 IST daily = 02:30 UTC
+  workflow_dispatch: {}
+
+jobs:
+  run-digest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # seen_jobs.json persists across runs via cache (not committed to the
+      # repo) so the digest only ever emails genuinely new postings.
+      - uses: actions/cache@v4
+        with:
+          path: seen_jobs.json
+          key: seen-jobs-${{ github.run_id }}
+          restore-keys: |
+            seen-jobs-
+
+      - name: Run job digest
+        env:
+          JOB_DIGEST_EMAIL: ${{ secrets.JOB_DIGEST_EMAIL }}
+          JOB_DIGEST_APP_PASSWORD: ${{ secrets.JOB_DIGEST_APP_PASSWORD }}
+        run: python3 main.py
