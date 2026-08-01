@@ -4,21 +4,12 @@ import sys
 import config
 import experience
 import notify
-import schedule_guard
 import skills
 import sources
 import state
 
 
 def main():
-    if not schedule_guard.should_run():
-        print(
-            f"Not the target hour ({config.TARGET_HOUR}:00 {config.TIMEZONE}) "
-            "or already ran today. Skipping."
-        )
-        return
-    schedule_guard.mark_ran_today()
-
     seen = state.load_seen(config.STATE_FILE)
     all_jobs, errors = sources.fetch_all(config.SOURCES)
 

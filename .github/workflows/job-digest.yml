@@ -5,14 +5,14 @@ on:
   # add JOB_DIGEST_EMAIL / JOB_DIGEST_APP_PASSWORD / (optionally)
   # JOB_DIGEST_RECIPIENT as repo secrets, uncomment the schedule block below.
   #
-  # GitHub's cron trigger is UTC-only with no timezone setting, so this
-  # fires every 30 min (2 chances within the target hour, in case GitHub
-  # delays a run) and main.py (via schedule_guard.py) decides whether it's
-  # actually TARGET_HOUR in TIMEZONE (config.py) before doing any real work
-  # — edit those two values to your own local hour/timezone. Only one send
-  # happens per day regardless of how often this fires.
+  # GitHub Actions cron is UTC-only (no timezone setting) - convert your
+  # target local time to UTC by hand and edit the cron line(s) below. The
+  # example here fires twice a day: 03:30 UTC and 12:30 UTC (09:00 and
+  # 18:00 IST) - add/remove `- cron:` lines for however many times a day
+  # you want it to run.
   # schedule:
-  #   - cron: "*/30 * * * *"
+  #   - cron: "30 3 * * *"
+  #   - cron: "30 12 * * *"
   workflow_dispatch: {}
 
 jobs:
@@ -25,17 +25,14 @@ jobs:
         with:
           python-version: "3.11"
 
-      # seen_jobs.json + last_run.json persist across runs via cache (not
-      # committed to the repo) so the digest only ever emails genuinely new
-      # postings, and only once per target day.
+      # seen_jobs.json persists across runs via cache (not committed to the
+      # repo) so the digest only ever emails genuinely new postings.
       - uses: actions/cache@v4
         with:
-          path: |
-            seen_jobs.json
-            last_run.json
-          key: job-digest-state-${{ github.run_id }}
+          path: seen_jobs.json
+          key: seen-jobs-${{ github.run_id }}
           restore-keys: |
-            job-digest-state-
+            seen-jobs-
 
       - name: Run job digest
         env:
