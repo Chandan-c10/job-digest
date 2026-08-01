@@ -25,11 +25,14 @@ jobs:
         with:
           python-version: "3.11"
 
-      # seen_jobs.json persists across runs via cache (not committed to the
-      # repo) so the digest only ever emails genuinely new postings.
+      # seen_jobs.json and telegram_state.json persist across runs via cache
+      # (not committed to the repo) so the digest only ever emails genuinely
+      # new postings, and Telegram subscriber preferences carry over.
       - uses: actions/cache@v4
         with:
-          path: seen_jobs.json
+          path: |
+            seen_jobs.json
+            telegram_state.json
           key: seen-jobs-${{ github.run_id }}
           restore-keys: |
             seen-jobs-
@@ -38,4 +41,5 @@ jobs:
         env:
           JOB_DIGEST_EMAIL: ${{ secrets.JOB_DIGEST_EMAIL }}
           JOB_DIGEST_APP_PASSWORD: ${{ secrets.JOB_DIGEST_APP_PASSWORD }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         run: python3 main.py

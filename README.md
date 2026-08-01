@@ -86,15 +86,42 @@ IST). Each fires independently, so N cron lines means N emails/day.
 State (`seen_jobs.json`) persists between runs via `actions/cache`, not by
 committing it to the repo, so your job history doesn't clutter git log.
 
+## Telegram bot (optional second channel)
+
+A Telegram bot can deliver the same digest as chat messages, with a
+category picker so subscribers choose what they want without touching
+`config.py`:
+
+1. Message [@BotFather](https://t.me/BotFather) → `/newbot` → follow the
+   prompts → copy the bot token it gives you.
+2. Add it as a repo secret: `TELEGRAM_BOT_TOKEN`.
+3. Message your new bot `/start`. It replies with a category picker
+   (buttons toggle ✅/⬜; tap "Done" when set): DevOps, Cloud, Kubernetes,
+   Terraform / IaC, AI / GenAI, SRE — edit `TELEGRAM_CATEGORIES` /
+   `TELEGRAM_CATEGORY_LABELS` in `config.py` to change the options.
+4. Other commands: `/preferences` (reopen the picker), `/status`, `/pause`,
+   `/resume`, `/help`.
+
+**Timing:** same model as the email digest — no webhook, no always-on
+server. `telegram_bot.poll_commands()` checks for new Telegram messages
+once per run, so a `/preferences` change takes effect on the next
+scheduled run (or immediately if you manually trigger the workflow right
+after messaging the bot).
+
+Entirely optional: leave `TELEGRAM_BOT_TOKEN` unset and `telegram_bot.py`
+no-ops everywhere it's called — the email digest works exactly as before.
+
 ## Files
 
-- `config.py` — skills, sources, email settings
+- `config.py` — skills, sources, email settings, Telegram categories
 - `sources.py` — per-source fetchers (RemoteOK, We Work Remotely, Arbeitnow,
   Jobicy, Working Nomads, Himalayas)
 - `skills.py` — shared word-boundary skill matching
 - `experience.py` — seniority/years-of-experience filter
 - `state.py` — seen-job id persistence
 - `notify.py` — digest formatting + SMTP send
+- `telegram_bot.py` — optional Telegram channel: command polling, category
+  picker, digest formatting + send (all no-ops if `TELEGRAM_BOT_TOKEN` unset)
 - `main.py` — entrypoint
 
 ## License

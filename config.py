@@ -34,3 +34,30 @@ SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 587
 
 STATE_FILE = os.path.join(os.path.dirname(__file__), "seen_jobs.json")
+
+# Telegram bot: optional second delivery channel alongside email. Unset
+# TELEGRAM_BOT_TOKEN and the whole thing is a no-op — telegram_bot.py checks
+# it before making any API calls.
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+TELEGRAM_STATE_FILE = os.path.join(os.path.dirname(__file__), "telegram_state.json")
+
+# Categories a subscriber can pick from in the bot's /preferences menu, each
+# mapped to the skill names (from the tiers above) that count as a match for
+# that category. Keys are also what's stored in telegram_state.json.
+TELEGRAM_CATEGORIES = {
+    "devops": ["DevOps", "CI/CD", "Jenkins", "Git", "GitHub Actions", "Shell Scripting"],
+    "cloud": ["AWS", "Cloud Engineering"],
+    "k8s": ["Kubernetes", "Helm", "Docker"],
+    "terraform": ["Terraform", "Infrastructure as Code (IaC)", "Ansible"],
+    "ai": ["GenAI", "RAG", "FastAPI", "OpenAI", "LLM"],
+    "sre": ["Site Reliability Engineering (SRE)", "DevSecOps"],
+}
+
+TELEGRAM_CATEGORY_LABELS = {
+    "devops": "DevOps",
+    "cloud": "Cloud",
+    "k8s": "Kubernetes",
+    "terraform": "Terraform / IaC",
+    "ai": "AI / GenAI",
+    "sre": "SRE",
+}

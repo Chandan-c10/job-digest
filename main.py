@@ -7,9 +7,12 @@ import notify
 import skills
 import sources
 import state
+import telegram_bot
 
 
 def main():
+    telegram_bot.poll_commands()
+
     seen = state.load_seen(config.STATE_FILE)
     all_jobs, errors = sources.fetch_all(config.SOURCES)
 
@@ -28,6 +31,8 @@ def main():
     # tweak later doesn't resurface hundreds of old postings.
     seen.update(job["id"] for job in all_jobs)
     state.save_seen(config.STATE_FILE, seen)
+
+    telegram_bot.send_digest(new_jobs)
 
     body = notify.format_digest(new_jobs, errors)
     today = datetime.date.today().isoformat()
