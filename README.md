@@ -97,16 +97,31 @@ category picker so subscribers choose what they want without touching
 2. Add it as a repo secret: `TELEGRAM_BOT_TOKEN`.
 3. Message your new bot `/start`. It replies with a category picker
    (buttons toggle ✅/⬜; tap "Done" when set): DevOps, Cloud, Kubernetes,
-   Terraform / IaC, AI / GenAI, SRE — edit `TELEGRAM_CATEGORIES` /
-   `TELEGRAM_CATEGORY_LABELS` in `config.py` to change the options.
-4. Other commands: `/preferences` (reopen the picker), `/status`, `/pause`,
-   `/resume`, `/help`.
+   Terraform / IaC, AI / GenAI, SRE, Backend, Python, Golang — edit
+   `TELEGRAM_CATEGORIES` / `TELEGRAM_CATEGORY_LABELS` in `config.py` to
+   change the options.
+4. `/skills Rust, gRPC, Postgres` — add your own free-text keywords on top
+   of the categories above. A job matches if it's in a selected category
+   **or** mentions one of your custom keywords. `/skills` alone shows
+   what's set; `/skills clear` resets it.
+5. Other commands: `/preferences` (reopen the category picker), `/status`,
+   `/pause`, `/resume`, `/help`.
+
+**Important limit:** categories and `/skills` both only *narrow* the
+digest — they can't widen it. Every job still has to clear the global
+`MIN_SKILL_MATCHES`-across-the-tiers filter in `main.py` first (that's
+what builds the list Telegram ever sees). So a category or `/skills`
+keyword surfaces a posting only if it also already scored high enough on
+your `PRIMARY_SKILLS`/`SECONDARY_SKILLS`/`AI_SKILLS`. Making this fully
+independent per subscriber would mean moving that filter to run
+per-subscriber against every fetched job — a bigger change, not
+implemented here.
 
 **Timing:** same model as the email digest — no webhook, no always-on
 server. `telegram_bot.poll_commands()` checks for new Telegram messages
-once per run, so a `/preferences` change takes effect on the next
-scheduled run (or immediately if you manually trigger the workflow right
-after messaging the bot).
+once per run, so a `/preferences` or `/skills` change takes effect on the
+next scheduled run (or immediately if you manually trigger the workflow
+right after messaging the bot).
 
 Entirely optional: leave `TELEGRAM_BOT_TOKEN` unset and `telegram_bot.py`
 no-ops everywhere it's called — the email digest works exactly as before.

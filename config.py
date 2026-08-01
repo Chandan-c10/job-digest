@@ -11,7 +11,7 @@ PRIMARY_SKILLS = [
 SECONDARY_SKILLS = [
     "DevSecOps", "Ansible", "Helm", "GitHub Actions", "SonarQube", "Trivy",
     "Cloud Engineering", "Site Reliability Engineering (SRE)",
-    "Infrastructure as Code (IaC)",
+    "Infrastructure as Code (IaC)", "Golang",
 ]
 
 AI_SKILLS = [
@@ -51,6 +51,9 @@ TELEGRAM_CATEGORIES = {
     "terraform": ["Terraform", "Infrastructure as Code (IaC)", "Ansible"],
     "ai": ["GenAI", "RAG", "FastAPI", "OpenAI", "LLM"],
     "sre": ["Site Reliability Engineering (SRE)", "DevSecOps"],
+    "backend": ["Python", "Golang", "FastAPI"],
+    "python": ["Python"],
+    "golang": ["Golang"],
 }
 
 TELEGRAM_CATEGORY_LABELS = {
@@ -60,4 +63,7 @@ TELEGRAM_CATEGORY_LABELS = {
     "terraform": "Terraform / IaC",
     "ai": "AI / GenAI",
     "sre": "SRE",
+    "backend": "Backend",
+    "python": "Python",
+    "golang": "Golang",
 }

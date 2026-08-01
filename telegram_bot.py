@@ -9,6 +9,7 @@ effect on the next run (scheduled, or a manual workflow_dispatch).
 """
 import json
 import os
+import re
 import urllib.request
 
 import config
@@ -20,10 +21,14 @@ DEFAULT_CATEGORIES = list(config.TELEGRAM_CATEGORY_LABELS)
 HELP_TEXT = (
     "<b>Job Digest Bot</b>\n\n"
     "/preferences – choose which job categories you want\n"
+    "/skills – set custom skill keywords, e.g. /skills Rust, gRPC\n"
     "/status – show your current settings\n"
     "/pause – stop receiving digests\n"
     "/resume – start receiving digests again\n"
-    "/help – show this message"
+    "/help – show this message\n\n"
+    "Note: categories and /skills both only filter jobs that already "
+    "passed the bot's own DevOps/Cloud/AI skill match — they narrow that "
+    "set, they don't widen it."
 )
 
 
@@ -69,9 +74,11 @@ def _send(chat_id, text, keyboard=None):
 
 
 def _get_subscriber(state, chat_id):
-    return state["subscribers"].setdefault(
-        str(chat_id), {"categories": list(DEFAULT_CATEGORIES), "enabled": True}
+    sub = state["subscribers"].setdefault(
+        str(chat_id), {"categories": list(DEFAULT_CATEGORIES), "enabled": True, "custom_skills": []}
     )
+    sub.setdefault("custom_skills", [])
+    return sub
 
 
 def _handle_message(state, chat_id, text):
@@ -87,10 +94,33 @@ def _handle_message(state, chat_id, text):
         )
     elif text.startswith("/preferences"):
         _send(chat_id, "Your job categories:", _category_keyboard(sub["categories"]))
+    elif text.startswith("/skills"):
+        arg = text[len("/skills"):].strip()
+        if not arg:
+            current = ", ".join(sub["custom_skills"]) or "none set"
+            _send(
+                chat_id,
+                f"Your custom skill keywords: {current}\n\n"
+                "Set with: /skills Rust, gRPC, Postgres\n"
+                "Clear with: /skills clear",
+            )
+        elif arg.lower() == "clear":
+            sub["custom_skills"] = []
+            _send(chat_id, "Cleared your custom skill keywords.")
+        else:
+            terms = [t.strip() for t in arg.split(",") if t.strip()]
+            sub["custom_skills"] = terms
+            _send(
+                chat_id,
+                "Custom skill keywords set: " + ", ".join(terms) + "\n\n"
+                "You'll now also get jobs mentioning these, on top of your "
+                "selected categories.",
+            )
     elif text.startswith("/status"):
         cats = ", ".join(config.TELEGRAM_CATEGORY_LABELS[c] for c in sub["categories"]) or "none selected"
+        custom = ", ".join(sub["custom_skills"]) or "none"
         state_txt = "active" if sub["enabled"] else "paused"
-        _send(chat_id, f"Status: <b>{state_txt}</b>\nCategories: {cats}")
+        _send(chat_id, f"Status: <b>{state_txt}</b>\nCategories: {cats}\nCustom skills: {custom}")
     elif text.startswith("/pause"):
         sub["enabled"] = False
         _send(chat_id, "Paused. Send /resume anytime to start getting digests again.")
@@ -164,10 +194,15 @@ def _apply_keyboard(job):
     return {"inline_keyboard": [[{"text": "\U0001f517 Apply", "url": job["url"]}]]}
 
 
+def _matches_custom_skills(custom_skills, text):
+    text = (text or "").lower()
+    return any(re.search(r"\b" + re.escape(term.lower()) + r"\b", text) for term in custom_skills)
+
+
 def send_digest(jobs):
     """Send new matching jobs to every enabled subscriber, filtered to the
-    categories each subscriber picked. No-op if the bot token isn't
-    configured or there are no jobs to send."""
+    categories/custom skills each subscriber picked. No-op if the bot token
+    isn't configured or there are no jobs to send."""
     if not config.TELEGRAM_BOT_TOKEN or not jobs:
         return
     state = load_state()
@@ -177,7 +212,16 @@ def send_digest(jobs):
         allowed_skills = set()
         for cat in sub.get("categories", []):
             allowed_skills.update(config.TELEGRAM_CATEGORIES.get(cat, []))
-        matched = [j for j in jobs if allowed_skills & set(j.get("skills_matched", []))] if allowed_skills else jobs
+        custom_skills = sub.get("custom_skills", [])
+
+        if not allowed_skills and not custom_skills:
+            matched = jobs
+        else:
+            matched = [
+                j for j in jobs
+                if (allowed_skills & set(j.get("skills_matched", [])))
+                or (custom_skills and _matches_custom_skills(custom_skills, j.get("text_for_match", "")))
+            ]
         if not matched:
             continue
         count_text = f"{len(matched)} new matching job{'s' if len(matched) != 1 else ''}"
