@@ -8,12 +8,14 @@ behalf — you still click "Apply" yourself.
 Deliberately excludes LinkedIn and any platform requiring a logged-in
 session: scraping/bot-applying on those violates their Terms of Service and
 risks account suspension. This only touches sources with public, ToS-friendly
-access (a public JSON API or an RSS feed).
+access (a public JSON API or an RSS feed) — each one verified live (real
+HTTP 200 + real job data) before being wired in, not just assumed to work.
 
 ## How it works
 
-1. `sources.py` fetches postings from RemoteOK's public API and We Work
-   Remotely's public RSS feeds.
+1. `sources.py` fetches postings from seven sources: RemoteOK, We Work
+   Remotely (2 RSS categories), Arbeitnow, Jobicy, Working Nomads, and
+   Himalayas — all public JSON APIs or RSS feeds, no login required.
 2. `skills.py` matches each posting's text against the skill tiers in
    `config.py` (word-boundary matching, so short terms like "Git" don't
    false-positive on "Legit").
@@ -87,7 +89,8 @@ committing it to the repo, so your job history doesn't clutter git log.
 ## Files
 
 - `config.py` — skills, sources, email settings
-- `sources.py` — per-source fetchers (RemoteOK API, We Work Remotely RSS)
+- `sources.py` — per-source fetchers (RemoteOK, We Work Remotely, Arbeitnow,
+  Jobicy, Working Nomads, Himalayas)
 - `skills.py` — shared word-boundary skill matching
 - `experience.py` — seniority/years-of-experience filter
 - `state.py` — seen-job id persistence

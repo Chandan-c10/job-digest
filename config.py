@@ -21,7 +21,10 @@ AI_SKILLS = [
 MIN_SKILL_MATCHES = 4
 
 # Sources to poll. Each must exist in sources.py's SOURCE_FUNCS.
-SOURCES = ["remoteok", "wwr_devops", "wwr_programming"]
+SOURCES = [
+    "remoteok", "wwr_devops", "wwr_programming",
+    "arbeitnow", "jobicy", "working_nomads", "himalayas",
+]
 
 SENDER_EMAIL = os.environ.get("JOB_DIGEST_EMAIL", "you@example.com")
 SENDER_APP_PASSWORD = os.environ.get("JOB_DIGEST_APP_PASSWORD")
