@@ -156,27 +156,12 @@ def _format_job(job):
     return (
         f"\U0001f4bc <b>{_escape(job['title'])}</b>\n"
         f"\U0001f3e2 {_escape(job['company'])} · {_escape(job['source'])}\n"
-        f"\U0001f9f0 {_escape(skills)}\n"
-        f'\U0001f517 <a href="{job["url"]}">Apply</a>'
+        f"\U0001f9f0 {_escape(skills)}"
     )
 
 
-def _chunk_jobs(jobs, header, limit=3800):
-    """Bundle jobs into as few messages as possible, staying under
-    Telegram's 4096-char message limit."""
-    chunks = []
-    current = [header]
-    current_len = len(header)
-    for job in jobs:
-        block = _format_job(job)
-        if current_len + len(block) + 2 > limit and len(current) > 1:
-            chunks.append("\n\n".join(current))
-            current, current_len = [header], len(header)
-        current.append(block)
-        current_len += len(block) + 2
-    if len(current) > 1:
-        chunks.append("\n\n".join(current))
-    return chunks
+def _apply_keyboard(job):
+    return {"inline_keyboard": [[{"text": "\U0001f517 Apply", "url": job["url"]}]]}
 
 
 def send_digest(jobs):
@@ -195,6 +180,7 @@ def send_digest(jobs):
         matched = [j for j in jobs if allowed_skills & set(j.get("skills_matched", []))] if allowed_skills else jobs
         if not matched:
             continue
-        header = f"\U0001f680 <b>{len(matched)} new matching job{'s' if len(matched) != 1 else ''}</b>"
-        for chunk in _chunk_jobs(matched, header):
-            _send(chat_id, chunk)
+        count_text = f"{len(matched)} new matching job{'s' if len(matched) != 1 else ''}"
+        _send(chat_id, f"\U0001f680 <b>{count_text}</b>")
+        for job in matched:
+            _send(chat_id, _format_job(job), _apply_keyboard(job))
