@@ -7,15 +7,20 @@ behalf — you still click "Apply" yourself.
 
 Deliberately excludes LinkedIn and any platform requiring a logged-in
 session: scraping/bot-applying on those violates their Terms of Service and
-risks account suspension. This only touches sources with public, ToS-friendly
-access (a public JSON API or an RSS feed) — each one verified live (real
-HTTP 200 + real job data) before being wired in, not just assumed to work.
+risks account suspension. This only touches sources with public,
+ToS-friendly access (a public JSON API, RSS feed, or plain server-rendered
+HTML) — each one verified live (real HTTP 200 + real job data) before being
+wired in, not just assumed to work.
 
 ## How it works
 
-1. `sources.py` fetches postings from seven sources: RemoteOK, We Work
-   Remotely (2 RSS categories), Arbeitnow, Jobicy, Working Nomads, and
-   Himalayas — all public JSON APIs or RSS feeds, no login required.
+1. `sources.py` fetches postings from eight sources: RemoteOK, We Work
+   Remotely (2 RSS categories), Arbeitnow, Jobicy, Working Nomads,
+   Himalayas — all public JSON APIs or RSS feeds, no login required — plus
+   Internshala, which has no API/RSS but is server-rendered, so it's
+   regex-parsed from the plain HTML instead. Several other well-known
+   Indian/global portals were tested and rejected: see "Why not more
+   sources?" below.
 2. `skills.py` matches each posting's text against the skill tiers in
    `config.py` (word-boundary matching, so short terms like "Git" don't
    false-positive on "Legit").
@@ -97,7 +102,7 @@ category picker so subscribers choose what they want without touching
 2. Add it as a repo secret: `TELEGRAM_BOT_TOKEN`.
 3. Message your new bot `/start`. It replies with a category picker
    (buttons toggle ✅/⬜; tap "Done" when set): DevOps, Cloud, Kubernetes,
-   Terraform / IaC, AI / GenAI, SRE, Backend, Python, Golang — edit
+   Terraform / IaC, AI / GenAI, SRE, Backend, Python — edit
    `TELEGRAM_CATEGORIES` / `TELEGRAM_CATEGORY_LABELS` in `config.py` to
    change the options.
 4. `/skills Rust, gRPC, Postgres` — add your own free-text keywords on top
@@ -161,11 +166,34 @@ manually trigger the workflow right after messaging the bot.
 Entirely optional: leave `TELEGRAM_BOT_TOKEN` unset and `telegram_bot.py`
 no-ops everywhere it's called — the email digest works exactly as before.
 
+## Why not more sources?
+
+Every candidate below was actually tested live (real HTTP request, checked
+the response) before being accepted or rejected — not assumed either way:
+
+| Source | Result |
+|---|---|
+| LinkedIn | Excluded on principle, not tested — scraping/bot-applying violates its ToS and risks account suspension. |
+| Naukri, Dice, Instahyre, CutShort, Foundit, TimesJobs | JS-rendered SPA — the plain HTML response has zero job data, only an empty app shell that fills in client-side after JavaScript runs. |
+| Indeed, Glassdoor | `403 Forbidden` — actively blocked by Cloudflare/anti-bot protection. |
+| Apna, Shine.com | Real job data does exist somewhere on the page, but embedded in a React-streaming payload or a separate internal API rather than plain HTML — technically scrapable, but too fragile (breaks silently on any frontend change) to be worth it. |
+| jobseeker.com, talentanywhere.ai | Not actually job-listing aggregators — turned out to be a generic/parked-looking site and a staffing agency's marketing blog, respectively. |
+
+Getting past the JS-rendered/blocked ones would require full
+headless-browser automation (e.g. Playwright: load the page, run its JS,
+wait for listings to render, scrape the DOM) — a materially heavier,
+slower, and more fragile approach than the plain HTTP requests every
+current source uses, and a poor fit for a script meant to run in a few
+seconds on a free GitHub Actions runner. If you want to add one of these
+anyway, or know of another source with a real public API/RSS/server-rendered
+page, `sources.py`'s existing fetchers are the pattern to follow — see
+`fetch_internshala()` for how to regex-parse an HTML-only source.
+
 ## Files
 
 - `config.py` — skills, sources, email settings, Telegram categories
 - `sources.py` — per-source fetchers (RemoteOK, We Work Remotely, Arbeitnow,
-  Jobicy, Working Nomads, Himalayas)
+  Jobicy, Working Nomads, Himalayas, Internshala)
 - `skills.py` — shared word-boundary skill matching
 - `experience.py` — seniority/years-of-experience filter
 - `state.py` — seen-job id persistence and the pending-jobs accumulator

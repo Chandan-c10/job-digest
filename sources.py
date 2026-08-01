@@ -163,6 +163,36 @@ def fetch_himalayas():
     return jobs
 
 
+def fetch_internshala():
+    """Internshala has no API/RSS, but unlike most Indian job portals its
+    listing pages are server-rendered (confirmed by testing directly) - full
+    title, company, and description are present in the plain HTML, no
+    headless browser needed. Cards are split on each job-title anchor since
+    there's no single reliable wrapping element to key off of."""
+    raw = _get("https://internshala.com/jobs/devops-jobs/")
+    html = raw.decode("utf-8", errors="replace")
+    matches = list(re.finditer(r'class="job-title-href"[^>]*href="([^"]+)"[^>]*>([^<]+)</a>', html))
+    jobs = []
+    for i, m in enumerate(matches):
+        link, title = m.group(1), m.group(2).strip()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(html)
+        chunk = html[m.start():end]
+        company_m = re.search(r'class="company-name">\s*([^<\n]+?)\s*</p>', chunk)
+        text = re.sub(r"<[^>]+>", " ", chunk)
+        text = re.sub(r"\s+", " ", text).strip()
+        job_id = re.sub(r"\W+", "-", link.lower()).strip("-")
+        jobs.append({
+            "id": f"internshala-{job_id}",
+            "title": title,
+            "company": company_m.group(1).strip() if company_m else "Unknown",
+            "url": f"https://internshala.com{link}",
+            "source": "Internshala",
+            "posted": "",
+            "text_for_match": text,
+        })
+    return jobs
+
+
 SOURCE_FUNCS = {
     "remoteok": fetch_remoteok,
     "wwr_devops": fetch_wwr_devops,
@@ -171,6 +201,7 @@ SOURCE_FUNCS = {
     "jobicy": fetch_jobicy,
     "working_nomads": fetch_working_nomads,
     "himalayas": fetch_himalayas,
+    "internshala": fetch_internshala,
 }
 
 

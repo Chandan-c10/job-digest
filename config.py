@@ -11,7 +11,7 @@ PRIMARY_SKILLS = [
 SECONDARY_SKILLS = [
     "DevSecOps", "Ansible", "Helm", "GitHub Actions", "SonarQube", "Trivy",
     "Cloud Engineering", "Site Reliability Engineering (SRE)",
-    "Infrastructure as Code (IaC)", "Golang",
+    "Infrastructure as Code (IaC)",
 ]
 
 AI_SKILLS = [
@@ -23,7 +23,7 @@ MIN_SKILL_MATCHES = 4
 # Sources to poll. Each must exist in sources.py's SOURCE_FUNCS.
 SOURCES = [
     "remoteok", "wwr_devops", "wwr_programming",
-    "arbeitnow", "jobicy", "working_nomads", "himalayas",
+    "arbeitnow", "jobicy", "working_nomads", "himalayas", "internshala",
 ]
 
 SENDER_EMAIL = os.environ.get("JOB_DIGEST_EMAIL", "you@example.com")
@@ -62,9 +62,8 @@ TELEGRAM_CATEGORIES = {
     "terraform": ["Terraform", "Infrastructure as Code (IaC)", "Ansible"],
     "ai": ["GenAI", "RAG", "FastAPI", "OpenAI", "LLM"],
     "sre": ["Site Reliability Engineering (SRE)", "DevSecOps"],
-    "backend": ["Python", "Golang", "FastAPI"],
+    "backend": ["Python", "FastAPI"],
     "python": ["Python"],
-    "golang": ["Golang"],
 }
 
 TELEGRAM_CATEGORY_LABELS = {
@@ -76,5 +75,4 @@ TELEGRAM_CATEGORY_LABELS = {
     "sre": "SRE",
     "backend": "Backend",
     "python": "Python",
-    "golang": "Golang",
 }
