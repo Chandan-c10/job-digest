@@ -2,3 +2,4 @@ __pycache__/
 *.pyc
 seen_jobs.json
 telegram_state.json
+pending_jobs.json

@@ -1,11 +1,20 @@
 """Telegram bot integration: sends the job digest to subscribers and lets
-them pick job categories via chat commands and inline buttons.
+them pick job categories, custom skills, and a notification mode via chat
+commands and inline buttons.
 
 Polled once per script run (getUpdates with timeout=0, a non-blocking
 "anything since last time?" check) rather than a persistent long-poll or
 webhook — that fits the same GitHub Actions cron model as the email digest,
 no always-on process required. A preference change sent to the bot takes
 effect on the next run (scheduled, or a manual workflow_dispatch).
+
+Three notification modes (config.py's IS_OFFICIAL_RUN + the extra hourly
+workflow trigger make this work without a server — see main.py):
+  - scheduled (default): full digest only on official runs (deliver_scheduled).
+  - queue: an immediate lightweight ping per job (ping_queue), *plus* the
+    full entry at the next official run, same as scheduled subscribers get.
+  - instant: full entry immediately, on whichever run first finds it
+    (deliver_instant) — never repeated at the official run.
 """
 import json
 import os
@@ -18,10 +27,15 @@ API_URL = "https://api.telegram.org/bot{token}/{method}"
 
 DEFAULT_CATEGORIES = list(config.TELEGRAM_CATEGORY_LABELS)
 
+MODE_LABELS = {"scheduled": "Scheduled", "queue": "Queue", "instant": "Instant"}
+
 HELP_TEXT = (
     "<b>Job Digest Bot</b>\n\n"
     "/preferences – choose which job categories you want\n"
     "/skills – set custom skill keywords, e.g. /skills Rust, gRPC\n"
+    "/scheduled – notify me only at the normal digest times (default)\n"
+    "/queue – early heads-up ping now, full entry at the normal digest time\n"
+    "/instant – notify me as soon as a match is found (~hourly checks)\n"
     "/status – show your current settings\n"
     "/pause – stop receiving digests\n"
     "/resume – start receiving digests again\n"
@@ -75,9 +89,16 @@ def _send(chat_id, text, keyboard=None):
 
 def _get_subscriber(state, chat_id):
     sub = state["subscribers"].setdefault(
-        str(chat_id), {"categories": list(DEFAULT_CATEGORIES), "enabled": True, "custom_skills": []}
+        str(chat_id),
+        {
+            "categories": list(DEFAULT_CATEGORIES),
+            "enabled": True,
+            "custom_skills": [],
+            "notification_mode": "scheduled",
+        },
     )
     sub.setdefault("custom_skills", [])
+    sub.setdefault("notification_mode", "scheduled")
     return sub
 
 
@@ -116,11 +137,43 @@ def _handle_message(state, chat_id, text):
                 "You'll now also get jobs mentioning these, on top of your "
                 "selected categories.",
             )
+    elif text.startswith("/scheduled"):
+        sub["notification_mode"] = "scheduled"
+        _send(
+            chat_id,
+            "✅ Scheduled mode is enabled.\n\n"
+            "You will receive job notifications according to the normal "
+            "posting schedule.",
+        )
+    elif text.startswith("/queue"):
+        sub["notification_mode"] = "queue"
+        _send(
+            chat_id,
+            "✅ Queue mode is enabled.\n\n"
+            "You'll receive jobs as soon as they enter the notification "
+            "queue, before the scheduled notification is triggered.",
+        )
+    elif text.startswith("/instant"):
+        sub["notification_mode"] = "instant"
+        _send(
+            chat_id,
+            "✅ Instant mode is enabled.\n\n"
+            "You'll receive matching job alerts as soon as new jobs become "
+            "available.",
+        )
     elif text.startswith("/status"):
-        cats = ", ".join(config.TELEGRAM_CATEGORY_LABELS[c] for c in sub["categories"]) or "none selected"
+        mode_label = MODE_LABELS.get(sub["notification_mode"], "Scheduled")
+        state_txt = "Enabled ✅" if sub["enabled"] else "Paused ⏸"
+        cat_lines = "\n".join(f"• {config.TELEGRAM_CATEGORY_LABELS[c]}" for c in sub["categories"]) or "• none selected"
         custom = ", ".join(sub["custom_skills"]) or "none"
-        state_txt = "active" if sub["enabled"] else "paused"
-        _send(chat_id, f"Status: <b>{state_txt}</b>\nCategories: {cats}\nCustom skills: {custom}")
+        _send(
+            chat_id,
+            "\U0001f4ca <b>Your Settings</b>\n\n"
+            f"Notification Mode:\n• {mode_label}\n\n"
+            f"Notifications: {state_txt}\n\n"
+            f"Selected Categories:\n{cat_lines}\n\n"
+            f"Custom skills: {custom}",
+        )
     elif text.startswith("/pause"):
         sub["enabled"] = False
         _send(chat_id, "Paused. Send /resume anytime to start getting digests again.")
@@ -194,37 +247,84 @@ def _apply_keyboard(job):
     return {"inline_keyboard": [[{"text": "\U0001f517 Apply", "url": job["url"]}]]}
 
 
+def _format_queue_ping(job):
+    return (
+        "\U0001f4e5 <b>Job Added to Queue</b>\n\n"
+        f"\U0001f3e2 Company: {_escape(job['company'])}\n"
+        f"\U0001f4bc Role: {_escape(job['title'])}\n"
+        "\U0001f4cd Remote\n\n"
+        "Status: Waiting for scheduled notification\n\n"
+        "This job is now in your queue."
+    )
+
+
 def _matches_custom_skills(custom_skills, text):
     text = (text or "").lower()
     return any(re.search(r"\b" + re.escape(term.lower()) + r"\b", text) for term in custom_skills)
 
 
-def send_digest(jobs):
-    """Send new matching jobs to every enabled subscriber, filtered to the
-    categories/custom skills each subscriber picked. No-op if the bot token
-    isn't configured or there are no jobs to send."""
-    if not config.TELEGRAM_BOT_TOKEN or not jobs:
+def _matching_jobs(sub, jobs):
+    allowed_skills = set()
+    for cat in sub.get("categories", []):
+        allowed_skills.update(config.TELEGRAM_CATEGORIES.get(cat, []))
+    custom_skills = sub.get("custom_skills", [])
+
+    if not allowed_skills and not custom_skills:
+        return list(jobs)
+    return [
+        j for j in jobs
+        if (allowed_skills & set(j.get("skills_matched", [])))
+        or (custom_skills and _matches_custom_skills(custom_skills, j.get("text_for_match", "")))
+    ]
+
+
+def _send_job_cards(chat_id, jobs):
+    count_text = f"{len(jobs)} new matching job{'s' if len(jobs) != 1 else ''}"
+    _send(chat_id, f"\U0001f680 <b>{count_text}</b>")
+    for job in jobs:
+        _send(chat_id, _format_job(job), _apply_keyboard(job))
+
+
+def deliver_instant(new_jobs):
+    """Send this run's newly discovered jobs immediately to instant-mode
+    subscribers. Safe to call on every run (frequent or official) — each
+    job only ever appears in new_jobs once, system-wide, so there's no
+    risk of a double-send later at the official run."""
+    if not config.TELEGRAM_BOT_TOKEN or not new_jobs:
         return
     state = load_state()
     for chat_id, sub in state["subscribers"].items():
-        if not sub.get("enabled", True):
+        if not sub.get("enabled", True) or sub.get("notification_mode") != "instant":
             continue
-        allowed_skills = set()
-        for cat in sub.get("categories", []):
-            allowed_skills.update(config.TELEGRAM_CATEGORIES.get(cat, []))
-        custom_skills = sub.get("custom_skills", [])
+        matched = _matching_jobs(sub, new_jobs)
+        if matched:
+            _send_job_cards(chat_id, matched)
 
-        if not allowed_skills and not custom_skills:
-            matched = jobs
-        else:
-            matched = [
-                j for j in jobs
-                if (allowed_skills & set(j.get("skills_matched", [])))
-                or (custom_skills and _matches_custom_skills(custom_skills, j.get("text_for_match", "")))
-            ]
-        if not matched:
+
+def ping_queue(new_jobs):
+    """Send a lightweight heads-up for this run's newly discovered jobs to
+    queue-mode subscribers. The full entry follows later, at the next
+    official run, via deliver_scheduled(). Safe to call on every run."""
+    if not config.TELEGRAM_BOT_TOKEN or not new_jobs:
+        return
+    state = load_state()
+    for chat_id, sub in state["subscribers"].items():
+        if not sub.get("enabled", True) or sub.get("notification_mode") != "queue":
             continue
-        count_text = f"{len(matched)} new matching job{'s' if len(matched) != 1 else ''}"
-        _send(chat_id, f"\U0001f680 <b>{count_text}</b>")
-        for job in matched:
-            _send(chat_id, _format_job(job), _apply_keyboard(job))
+        for job in _matching_jobs(sub, new_jobs):
+            _send(chat_id, _format_queue_ping(job))
+
+
+def deliver_scheduled(pending_jobs):
+    """Flush everything accumulated since the last official run to
+    scheduled- and queue-mode subscribers. Call only when
+    config.IS_OFFICIAL_RUN is true."""
+    if not config.TELEGRAM_BOT_TOKEN or not pending_jobs:
+        return
+    state = load_state()
+    for chat_id, sub in state["subscribers"].items():
+        if not sub.get("enabled", True) or sub.get("notification_mode") not in ("scheduled", "queue"):
+            continue
+        matched = _matching_jobs(sub, pending_jobs)
+        if matched:
+            _send_job_cards(chat_id, matched)

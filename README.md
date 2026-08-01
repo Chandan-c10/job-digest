@@ -107,6 +107,41 @@ category picker so subscribers choose what they want without touching
 5. Other commands: `/preferences` (reopen the category picker), `/status`,
    `/pause`, `/resume`, `/help`.
 
+### Notification modes
+
+Each subscriber has exactly one active mode, switched anytime — setting a
+new one replaces the old one:
+
+| Command | Mode | Behavior |
+|---|---|---|
+| `/scheduled` (default) | Scheduled | Full digest only at the official run times. |
+| `/queue` | Queue | An early "added to queue" ping the moment a job is found, **plus** the full entry at the next official run. |
+| `/instant` | Instant | The full entry immediately, whenever a job is first found — never repeated later. |
+
+`/status` shows the active mode along with categories, custom skills, and
+pause state.
+
+**How "instant" actually works — no server, so no true push.** Queue and
+instant modes only do anything if you enable the optional hourly
+`- cron: "0 * * * *"` trigger in the workflow file (commented out by
+default alongside the rest of the schedule). That trigger fetches jobs and
+pings instant/queue subscribers, but never sends email and never runs the
+official digest — that's still only your official cron times. So
+"instant" really means "within an hour" (or whatever interval you set that
+trigger to), not real-time push. Scheduled-mode subscribers are completely
+unaffected by it either way.
+
+**Why an extra hourly run can't cause an official run to miss anything:**
+a job is marked "seen" in `seen_jobs.json` the first time *any* run —
+hourly or official — fetches it, so it only ever counts as "new" once,
+system-wide. To stop that from meaning "an hourly run steals a job from
+scheduled-mode subscribers," every newly-found job is *also* appended to
+`pending_jobs.json` regardless of which run found it or who it's for. The
+official run flushes and clears that whole accumulated list (to email, and
+to scheduled/queue Telegram subscribers) rather than just its own run's
+finds. Instant-mode delivery, by contrast, only ever uses that specific
+run's own finds, so instant subscribers never see a repeat.
+
 **Important limit:** categories and `/skills` both only *narrow* the
 digest — they can't widen it. Every job still has to clear the global
 `MIN_SKILL_MATCHES`-across-the-tiers filter in `main.py` first (that's
@@ -119,9 +154,9 @@ implemented here.
 
 **Timing:** same model as the email digest — no webhook, no always-on
 server. `telegram_bot.poll_commands()` checks for new Telegram messages
-once per run, so a `/preferences` or `/skills` change takes effect on the
-next scheduled run (or immediately if you manually trigger the workflow
-right after messaging the bot).
+once per run, so a `/preferences`, `/skills`, or mode change takes effect
+on the next scheduled (or hourly, if enabled) run — or immediately if you
+manually trigger the workflow right after messaging the bot.
 
 Entirely optional: leave `TELEGRAM_BOT_TOKEN` unset and `telegram_bot.py`
 no-ops everywhere it's called — the email digest works exactly as before.
@@ -133,10 +168,12 @@ no-ops everywhere it's called — the email digest works exactly as before.
   Jobicy, Working Nomads, Himalayas)
 - `skills.py` — shared word-boundary skill matching
 - `experience.py` — seniority/years-of-experience filter
-- `state.py` — seen-job id persistence
+- `state.py` — seen-job id persistence and the pending-jobs accumulator
+  (`pending_jobs.json`) between official runs
 - `notify.py` — digest formatting + SMTP send
 - `telegram_bot.py` — optional Telegram channel: command polling, category
-  picker, digest formatting + send (all no-ops if `TELEGRAM_BOT_TOKEN` unset)
+  picker, notification-mode handling, digest formatting + send (all no-ops
+  if `TELEGRAM_BOT_TOKEN` unset)
 - `main.py` — entrypoint
 
 ## License

@@ -9,10 +9,19 @@ on:
   # target local time to UTC by hand and edit the cron line(s) below. The
   # example here fires twice a day: 03:30 UTC and 12:30 UTC (09:00 and
   # 18:00 IST) - add/remove `- cron:` lines for however many times a day
-  # you want it to run.
+  # you want it to run. Each of these is an "official" run: email + the
+  # full Telegram digest to scheduled/queue subscribers.
   # schedule:
   #   - cron: "30 3 * * *"
   #   - cron: "30 12 * * *"
+  #   # Optional: an hourly discovery-only trigger for Telegram instant/queue
+  #   # mode (see README's "Notification modes"). Never sends email, never
+  #   # runs the official digest - just finds new jobs and pings
+  #   # instant/queue subscribers faster than the official times above.
+  #   # Safe to omit if you don't use those modes. Must not land on the
+  #   # same minute as an official cron line above (here it doesn't: this
+  #   # fires on the hour, those fire at :30).
+  #   - cron: "0 * * * *"
   workflow_dispatch: {}
 
 jobs:
@@ -25,14 +34,18 @@ jobs:
         with:
           python-version: "3.11"
 
-      # seen_jobs.json and telegram_state.json persist across runs via cache
-      # (not committed to the repo) so the digest only ever emails genuinely
-      # new postings, and Telegram subscriber preferences carry over.
+      # seen_jobs.json, telegram_state.json, and pending_jobs.json persist
+      # across runs via cache (not committed to the repo): seen_jobs.json so
+      # the digest only ever emails genuinely new postings, telegram_state.
+      # json so subscriber preferences carry over, and pending_jobs.json so
+      # jobs found by an hourly discovery run (if you enabled it above)
+      # aren't lost before the next official run flushes them.
       - uses: actions/cache@v4
         with:
           path: |
             seen_jobs.json
             telegram_state.json
+            pending_jobs.json
           key: seen-jobs-${{ github.run_id }}
           restore-keys: |
             seen-jobs-
@@ -42,4 +55,10 @@ jobs:
           JOB_DIGEST_EMAIL: ${{ secrets.JOB_DIGEST_EMAIL }}
           JOB_DIGEST_APP_PASSWORD: ${{ secrets.JOB_DIGEST_APP_PASSWORD }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          # False only if you enabled the hourly discovery-only trigger
+          # above; true for every official schedule time and for manual
+          # workflow_dispatch runs (github.event.schedule is empty there,
+          # so != '0 * * * *'). Harmless to leave in even if you never
+          # enable the hourly trigger.
+          TELEGRAM_OFFICIAL_RUN: ${{ github.event.schedule != '0 * * * *' }}
         run: python3 main.py
