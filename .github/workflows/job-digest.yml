@@ -1,11 +1,18 @@
 name: Job Digest
 
 on:
-  # This template ships with the daily schedule disabled. After you fork
-  # this and add JOB_DIGEST_EMAIL / JOB_DIGEST_APP_PASSWORD / (optionally)
+  # This template ships with the schedule disabled. After you fork this and
+  # add JOB_DIGEST_EMAIL / JOB_DIGEST_APP_PASSWORD / (optionally)
   # JOB_DIGEST_RECIPIENT as repo secrets, uncomment the schedule block below.
+  #
+  # GitHub's cron trigger is UTC-only with no timezone setting, so this
+  # fires every 30 min (2 chances within the target hour, in case GitHub
+  # delays a run) and main.py (via schedule_guard.py) decides whether it's
+  # actually TARGET_HOUR in TIMEZONE (config.py) before doing any real work
+  # — edit those two values to your own local hour/timezone. Only one send
+  # happens per day regardless of how often this fires.
   # schedule:
-  #   - cron: "30 2 * * *"  # 08:00 IST daily = 02:30 UTC
+  #   - cron: "*/30 * * * *"
   workflow_dispatch: {}
 
 jobs:
@@ -18,14 +25,17 @@ jobs:
         with:
           python-version: "3.11"
 
-      # seen_jobs.json persists across runs via cache (not committed to the
-      # repo) so the digest only ever emails genuinely new postings.
+      # seen_jobs.json + last_run.json persist across runs via cache (not
+      # committed to the repo) so the digest only ever emails genuinely new
+      # postings, and only once per target day.
       - uses: actions/cache@v4
         with:
-          path: seen_jobs.json
-          key: seen-jobs-${{ github.run_id }}
+          path: |
+            seen_jobs.json
+            last_run.json
+          key: job-digest-state-${{ github.run_id }}
           restore-keys: |
-            seen-jobs-
+            job-digest-state-
 
       - name: Run job digest
         env:

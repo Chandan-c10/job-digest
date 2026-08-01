@@ -31,3 +31,11 @@ SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 587
 
 STATE_FILE = os.path.join(os.path.dirname(__file__), "seen_jobs.json")
+
+# GitHub Actions' cron trigger is UTC-only with no timezone setting, so the
+# workflow fires every 15 min and main.py itself decides whether it's
+# actually the target hour in TIMEZONE (schedule_guard.py) before doing any
+# work. Change these to your own local time / timezone as needed.
+TIMEZONE = "Asia/Kolkata"
+TARGET_HOUR = 8  # 24-hour, in TIMEZONE
+LAST_RUN_FILE = os.path.join(os.path.dirname(__file__), "last_run.json")
