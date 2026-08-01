@@ -72,12 +72,23 @@ commented out. To activate it on your fork:
 3. Commit and push. It'll run on GitHub's infrastructure — no need for your
    own machine to be on.
 
-> **No server needed — no external service at all.** GitHub Actions is a
-> free tool. Once the schedule is uncommented, GitHub wakes up a runner at
-> each cron time, checks out the repo, runs `python3 main.py` exactly like
-> the local test command above, and tears the runner down when it's done.
-> There's no server to host, no cron provider to sign up for, and (on public
-> repos) nothing to pay for.
+> **No server needed — no external service at all.** This whole project
+> runs entirely on GitHub Actions: no VM to rent, no VPS to keep patched,
+> no cron host, no third-party scheduler to sign up for. Once the schedule
+> is uncommented, GitHub itself wakes up a fresh runner at each cron time,
+> checks out the repo, installs Python, runs `python3 main.py` exactly like
+> the local test command above, and tears the runner down when it's
+> done — nothing stays running, nothing to host or maintain.
+>
+> **And it's free either way you fork it:**
+> - **Public repo:** unlimited Actions minutes, $0, no catch.
+> - **Private repo:** 2,000 free Actions minutes/month (GitHub's standard
+>   free-tier allowance). Each run finishes in well under a minute, but
+>   Actions bills a minimum of 1 minute per run regardless — with just the
+>   2 official triggers that's ~60 min/month (3% of the budget); adding the
+>   optional hourly Telegram instant/queue trigger brings it to ~780
+>   min/month (about 39%). Either way, comfortably inside the free
+>   allowance with room to spare, even running the hourly trigger 24/7.
 
 ### Timezone handling
 
