@@ -100,12 +100,29 @@ spare, even running the hourly trigger 24/7.
 
 ### Timezone handling
 
-GitHub Actions' `schedule:` cron trigger is **UTC-only** — there's no
-setting to make it fire at a local time directly, so you convert by hand:
-subtract 5:30 from IST to get UTC (e.g. 9:00 AM IST → 03:30 UTC), or look
-up the equivalent offset for your own timezone. Add one `- cron:` line per
-trigger you want — the template ships with two as an example (9 AM and 6 PM
-IST). Each fires independently, so N cron lines means N emails/day.
+GitHub Actions' `schedule:` cron trigger is **UTC-only** and is read
+straight from the workflow file by GitHub's own scheduler — there's no way
+for `main.py` to compute or adjust it at runtime (that would be circular:
+the script would need to already be running to change when it runs). So
+the conversion has to happen before you commit the `cron:` line, not after.
+
+Run `ist_to_cron.py` with any IST time to get a ready-to-paste line —
+already nudged off `:00`/`:15`/`:30`/`:45`, the minutes GitHub's scheduler
+is most congested at (this template's own trigger once got delayed by
+3+ hours from landing on `:30`):
+
+```bash
+python3 ist_to_cron.py "9:00 AM"
+# - cron: "37 3 * * *"
+# fires ~09:07 AM IST (UTC-only, off-peak minute)
+```
+
+For a different timezone, look up its UTC offset and adjust `IST_OFFSET`
+at the top of the script.
+
+Add one `- cron:` line per trigger you want — the template ships with two
+as an example. Each fires independently, so N cron lines means N
+emails/day.
 
 State (`seen_jobs.json`) persists between runs via `actions/cache`, not by
 committing it to the repo, so your job history doesn't clutter git log.
@@ -218,6 +235,8 @@ page, `sources.py`'s existing fetchers are the pattern to follow — see
 - `config.py` — every setting you'd want to change: skills, experience
   range, job type/location filters, sources, email settings, Telegram
   categories
+- `ist_to_cron.py` — converts an IST time to an off-peak UTC `cron:` line
+  for the workflow file (see "Timezone handling")
 - `sources.py` — per-source fetchers (RemoteOK, We Work Remotely, Arbeitnow,
   Jobicy, Working Nomads, Himalayas, Internshala)
 - `skills.py` — shared word-boundary skill matching

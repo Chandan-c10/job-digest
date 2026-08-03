@@ -6,22 +6,27 @@ on:
   # JOB_DIGEST_RECIPIENT as repo secrets, uncomment the schedule block below.
   #
   # GitHub Actions cron is UTC-only (no timezone setting) - convert your
-  # target local time to UTC by hand and edit the cron line(s) below. The
-  # example here fires twice a day: 03:30 UTC and 12:30 UTC (09:00 and
-  # 18:00 IST) - add/remove `- cron:` lines for however many times a day
-  # you want it to run. Each of these is an "official" run: email + the
-  # full Telegram digest to scheduled/queue subscribers.
+  # target local time to UTC (README's "Timezone handling" has a full
+  # IST->UTC lookup table) and edit the cron line(s) below. The example
+  # here fires twice a day: 03:07 UTC and 12:53 UTC (~08:37 and ~06:23 PM
+  # IST) - add/remove `- cron:` lines for however many times a day you want
+  # it to run. Each of these is an "official" run: email + the full
+  # Telegram digest to scheduled/queue subscribers.
+  #
+  # Deliberately NOT on :00/:30 - GitHub's scheduler is most congested at
+  # the top/bottom of the hour (everyone else's cron jobs fire there too),
+  # which can delay a run by hours. Keep any custom minute off
+  # :00/:15/:30/:45 for the same reason.
   # schedule:
-  #   - cron: "30 3 * * *"
-  #   - cron: "30 12 * * *"
+  #   - cron: "7 3 * * *"
+  #   - cron: "53 12 * * *"
   #   # Optional: an hourly discovery-only trigger for Telegram instant/queue
   #   # mode (see README's "Notification modes"). Never sends email, never
   #   # runs the official digest - just finds new jobs and pings
   #   # instant/queue subscribers faster than the official times above.
   #   # Safe to omit if you don't use those modes. Must not land on the
-  #   # same minute as an official cron line above (here it doesn't: this
-  #   # fires on the hour, those fire at :30).
-  #   - cron: "0 * * * *"
+  #   # same minute as an official cron line above (here it doesn't).
+  #   - cron: "41 * * * *"
   workflow_dispatch: {}
 
 jobs:
@@ -58,7 +63,8 @@ jobs:
           # False only if you enabled the hourly discovery-only trigger
           # above; true for every official schedule time and for manual
           # workflow_dispatch runs (github.event.schedule is empty there,
-          # so != '0 * * * *'). Harmless to leave in even if you never
-          # enable the hourly trigger.
-          TELEGRAM_OFFICIAL_RUN: ${{ github.event.schedule != '0 * * * *' }}
+          # so != '41 * * * *'). Harmless to leave in even if you never
+          # enable the hourly trigger. Update the compared string if you
+          # change the hourly trigger's own minute.
+          TELEGRAM_OFFICIAL_RUN: ${{ github.event.schedule != '41 * * * *' }}
         run: python3 main.py
