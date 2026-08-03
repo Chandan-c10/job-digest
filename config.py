@@ -51,16 +51,38 @@ SMTP_PORT = 587
 
 STATE_FILE = os.path.join(os.path.dirname(__file__), "seen_jobs.json")
 
-# Jobs accumulate here between official runs (see IS_OFFICIAL_RUN below) so
-# a frequent discovery-only run never causes an official run to miss
-# something an intervening run already marked "seen".
-PENDING_JOBS_FILE = os.path.join(os.path.dirname(__file__), "pending_jobs.json")
+# --- Schedule (see schedule.py) -------------------------------------------
+# The workflow file's own cron just runs a fixed recurring check (e.g.
+# hourly) - THIS is the only place you edit to change when things fire.
+# No workflow/YAML edits needed for a time change.
 
-# True on the normal scheduled/manual runs (email + full Telegram digest).
-# False only on the extra frequent trigger added for Telegram instant/queue
-# mode, which discovers jobs and pings instant/queue subscribers but never
-# sends email or the official digest — see .github/workflows/job-digest.yml.
-IS_OFFICIAL_RUN = os.environ.get("TELEGRAM_OFFICIAL_RUN", "true").lower() != "false"
+# When to send the EMAIL digest (IST clock times). One entry per email/day.
+EMAIL_SCHEDULE_IST = ["9:00 AM", "6:00 PM"]
+
+# When to send the full TELEGRAM digest to scheduled/queue subscribers.
+# Two ways to set this - use ONE:
+#   - A simple recurring interval (this is what's active below): fires
+#     every N hours starting from midnight IST. Must evenly divide 24
+#     (1, 2, 3, 4, 6, 8, 12, 24). 2 -> 12 times/day; 1 -> 24 times/day.
+#   - Fixed clock times, same style as email: set TELEGRAM_INTERVAL_HOURS
+#     to None and fill in TELEGRAM_SCHEDULE_IST instead, e.g.
+#     ["9:00 AM", "6:00 PM"].
+TELEGRAM_INTERVAL_HOURS = 2
+TELEGRAM_SCHEDULE_IST = []
+
+# How close (minutes) "now" must be to a scheduled slot to count as due -
+# keep this >= how often the workflow's own schedule: trigger actually
+# runs, or a slot could be missed entirely between checks.
+SCHEDULE_TOLERANCE_MINUTES = 60
+
+SCHEDULE_STATE_FILE = os.path.join(os.path.dirname(__file__), "schedule_state.json")
+
+# Jobs accumulate here between scheduled fires so a frequent check-in run
+# never causes a scheduled send to miss something an intervening run
+# already marked "seen". Separate files since email and Telegram now have
+# independent schedules.
+PENDING_EMAIL_JOBS_FILE = os.path.join(os.path.dirname(__file__), "pending_email_jobs.json")
+PENDING_TELEGRAM_JOBS_FILE = os.path.join(os.path.dirname(__file__), "pending_telegram_jobs.json")
 
 # Telegram bot: optional second delivery channel alongside email. Unset
 # TELEGRAM_BOT_TOKEN and the whole thing is a no-op — telegram_bot.py checks

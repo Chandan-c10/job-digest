@@ -8,13 +8,14 @@ webhook — that fits the same GitHub Actions cron model as the email digest,
 no always-on process required. A preference change sent to the bot takes
 effect on the next run (scheduled, or a manual workflow_dispatch).
 
-Three notification modes (config.py's IS_OFFICIAL_RUN + the extra hourly
-workflow trigger make this work without a server — see main.py):
-  - scheduled (default): full digest only on official runs (deliver_scheduled).
+Three notification modes (schedule.telegram_due(), checked once per hourly
+workflow run, decides when "scheduled" fires — see main.py):
+  - scheduled (default): full digest only when schedule.telegram_due() is
+    true (deliver_scheduled).
   - queue: an immediate lightweight ping per job (ping_queue), *plus* the
-    full entry at the next official run, same as scheduled subscribers get.
+    full entry at the next scheduled fire, same as scheduled subscribers get.
   - instant: full entry immediately, on whichever run first finds it
-    (deliver_instant) — never repeated at the official run.
+    (deliver_instant) — never repeated at the next scheduled fire.
 """
 import json
 import os
@@ -291,9 +292,9 @@ def _send_job_cards(chat_id, jobs):
 
 def deliver_instant(new_jobs):
     """Send this run's newly discovered jobs immediately to instant-mode
-    subscribers. Safe to call on every run (frequent or official) — each
-    job only ever appears in new_jobs once, system-wide, so there's no
-    risk of a double-send later at the official run."""
+    subscribers. Safe to call on every run — each job only ever appears in
+    new_jobs once, system-wide, so there's no risk of a double-send later
+    at a scheduled fire."""
     if not config.TELEGRAM_BOT_TOKEN or not new_jobs:
         return
     state = load_state()
@@ -308,7 +309,7 @@ def deliver_instant(new_jobs):
 def ping_queue(new_jobs):
     """Send a lightweight heads-up for this run's newly discovered jobs to
     queue-mode subscribers. The full entry follows later, at the next
-    official run, via deliver_scheduled(). Safe to call on every run."""
+    scheduled fire, via deliver_scheduled(). Safe to call on every run."""
     if not config.TELEGRAM_BOT_TOKEN or not new_jobs:
         return
     state = load_state()
@@ -320,9 +321,9 @@ def ping_queue(new_jobs):
 
 
 def deliver_scheduled(pending_jobs):
-    """Flush everything accumulated since the last official run to
+    """Flush everything accumulated since the last scheduled fire to
     scheduled- and queue-mode subscribers. Call only when
-    config.IS_OFFICIAL_RUN is true."""
+    schedule.telegram_due() is true."""
     if not config.TELEGRAM_BOT_TOKEN or not pending_jobs:
         return
     state = load_state()

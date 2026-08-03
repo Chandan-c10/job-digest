@@ -4,6 +4,7 @@ import sys
 import config
 import experience
 import notify
+import schedule
 import skills
 import sources
 import state
@@ -38,7 +39,8 @@ def main():
     _telegram_safe("poll_commands", telegram_bot.poll_commands)
 
     seen = state.load_seen(config.STATE_FILE)
-    pending = state.load_pending(config.PENDING_JOBS_FILE)
+    pending_email = state.load_pending(config.PENDING_EMAIL_JOBS_FILE)
+    pending_telegram = state.load_pending(config.PENDING_TELEGRAM_JOBS_FILE)
     all_jobs, errors = sources.fetch_all(config.SOURCES)
 
     new_jobs = []
@@ -58,8 +60,7 @@ def main():
 
     # Mark every fetched job as seen (not just matches) so a threshold/skill
     # tweak later doesn't resurface hundreds of old postings. This happens
-    # every run, frequent or official, so a job is only ever "new" once,
-    # system-wide.
+    # every run so a job is only ever "new" once, system-wide.
     seen.update(job["id"] for job in all_jobs)
     state.save_seen(config.STATE_FILE, seen)
 
@@ -68,32 +69,38 @@ def main():
     _telegram_safe("deliver_instant", telegram_bot.deliver_instant, new_jobs)
     _telegram_safe("ping_queue", telegram_bot.ping_queue, new_jobs)
 
-    # Accumulate for the next official run — this is what lets a frequent
-    # discovery-only run exist without an official run ever missing a job
-    # it already marked "seen".
-    pending.extend(new_jobs)
+    # Accumulate for whichever channel next fires - email and Telegram now
+    # have fully independent schedules (see config.py / schedule.py), so
+    # each gets its own accumulator rather than sharing one.
+    pending_email.extend(new_jobs)
+    pending_telegram.extend(new_jobs)
 
-    if not config.IS_OFFICIAL_RUN:
-        state.save_pending(config.PENDING_JOBS_FILE, pending)
-        print(f"Discovery run: {len(new_jobs)} new job(s) found, {len(pending)} pending for the next official digest.")
-        return
+    email_due = schedule.email_due()
+    telegram_due = schedule.telegram_due()
 
-    # Official run: flush everything accumulated since the last one to
-    # scheduled/queue Telegram subscribers and to email.
-    _telegram_safe("deliver_scheduled", telegram_bot.deliver_scheduled, pending)
+    if email_due:
+        today = datetime.date.today().isoformat()
+        subject = f"Job Digest {today}: {len(pending_email)} new match(es)"
+        if pending_email or errors:
+            notify.send_email(subject, notify.format_digest(pending_email, errors))
+            print(f"Sent digest: {len(pending_email)} new job(s), {len(errors)} source error(s).")
+        else:
+            print("No new matching jobs. Skipping email.")
+        pending_email = []
 
-    body = notify.format_digest(pending, errors)
-    today = datetime.date.today().isoformat()
-    subject = f"Job Digest {today}: {len(pending)} new match(es)"
+    if telegram_due:
+        _telegram_safe("deliver_scheduled", telegram_bot.deliver_scheduled, pending_telegram)
+        pending_telegram = []
 
-    if not pending and not errors:
-        print("No new matching jobs. Skipping email.")
-        state.save_pending(config.PENDING_JOBS_FILE, [])
-        return
+    state.save_pending(config.PENDING_EMAIL_JOBS_FILE, pending_email)
+    state.save_pending(config.PENDING_TELEGRAM_JOBS_FILE, pending_telegram)
 
-    notify.send_email(subject, body)
-    state.save_pending(config.PENDING_JOBS_FILE, [])
-    print(f"Sent digest: {len(pending)} new job(s), {len(errors)} source error(s).")
+    if not email_due and not telegram_due:
+        print(
+            f"Check-in run: {len(new_jobs)} new job(s) found, "
+            f"{len(pending_email)} pending for email, "
+            f"{len(pending_telegram)} pending for Telegram."
+        )
 
 
 if __name__ == "__main__":

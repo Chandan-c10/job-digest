@@ -42,17 +42,25 @@ hunt for elsewhere:
    - `JOB_TYPES` / `LOCATIONS` — optional; leave empty to skip. Useful for
      Internshala's on-site listings since most other sources are
      remote-only anyway.
+   - `EMAIL_SCHEDULE_IST` / `TELEGRAM_INTERVAL_HOURS` (or
+     `TELEGRAM_SCHEDULE_IST`) — when things fire, in IST. See "Timezone
+     handling" below — you never need to touch the workflow file for this.
 3. If you skip step 2 entirely (all skill lists left empty), the script
    fails loudly with a clear error instead of silently finding nothing —
    go back and fill in at least one skill list.
 4. Create a Gmail App Password for whichever account will send the digest
    (Google Account → Security → 2-Step Verification → App Passwords).
-5. Run it locally to test:
+5. Run it locally to test. `GITHUB_EVENT_NAME=workflow_dispatch` makes it
+   send immediately regardless of the clock, same as a manual "Run
+   workflow" on GitHub — without it, a local run only actually sends
+   something if it happens to land within an hour of a time in
+   `config.py`:
 
    ```bash
    export JOB_DIGEST_EMAIL="you@gmail.com"
    export JOB_DIGEST_APP_PASSWORD="your-16-char-app-password"
    export JOB_DIGEST_RECIPIENT="you@gmail.com"   # defaults to JOB_DIGEST_EMAIL's value if unset
+   export GITHUB_EVENT_NAME="workflow_dispatch"
    python3 main.py
    ```
 
@@ -74,55 +82,61 @@ commented out. To activate it on your fork:
    | `JOB_DIGEST_APP_PASSWORD` | `abcd efgh ijkl mnop` (16-char Gmail App Password, not your account password) |
    | `JOB_DIGEST_RECIPIENT` | `you@gmail.com` (optional — omit to just send to `JOB_DIGEST_EMAIL`) |
 
-2. Uncomment the `schedule:` block in the workflow file, and edit the
-   `cron:` line(s) to your own target time(s) — see "Timezone handling"
-   below.
+2. Uncomment the `schedule:` block in the workflow file — that's the
+   *only* thing you ever touch there. Your actual send times go in
+   `config.py` instead (next section).
 3. Commit and push. It'll run on GitHub's infrastructure — no need for your
    own machine to be on.
 
-> **No server needed.** GitHub itself runs `python3 main.py` on your
-> schedule and throws the runner away when it's done — nothing to host,
-> nothing to maintain. Free on public repos; on private repos it uses a
-> small slice of GitHub's 2,000 free minutes/month (see below).
+> **No server needed.** GitHub itself runs `python3 main.py` on a fixed
+> hourly check and throws the runner away when it's done — nothing to
+> host, nothing to maintain. Free on public repos; on private repos it
+> uses a small slice of GitHub's 2,000 free minutes/month (see below).
 
 <details>
 <summary>Exact free-tier minutes, if you're curious</summary>
 
 Public repos get unlimited Actions minutes, $0. Private repos get 2,000
 free minutes/month. Each run finishes in well under a minute, but Actions
-bills a minimum of 1 minute per run regardless — with just the 2 official
-triggers that's ~60 min/month (3% of the budget); adding the optional
-hourly Telegram instant/queue trigger brings it to ~780 min/month (about
-39%). Either way, comfortably inside the free allowance with room to
-spare, even running the hourly trigger 24/7.
+bills a minimum of 1 minute per run regardless — the hourly check-in costs
+~720 min/month (~36% of the budget). Comfortably inside the free
+allowance with room to spare, running 24/7.
 
 </details>
 
 ### Timezone handling
 
-GitHub Actions' `schedule:` cron trigger is **UTC-only** and is read
-straight from the workflow file by GitHub's own scheduler — there's no way
-for `main.py` to compute or adjust it at runtime (that would be circular:
-the script would need to already be running to change when it runs). So
-the conversion has to happen before you commit the `cron:` line, not after.
+Set your actual send times in **`config.py`**, not the workflow file:
 
-Run `ist_to_cron.py` with any IST time to get a ready-to-paste line —
-already nudged off `:00`/`:15`/`:30`/`:45`, the minutes GitHub's scheduler
-is most congested at (this template's own trigger once got delayed by
-3+ hours from landing on `:30`):
-
-```bash
-python3 ist_to_cron.py "9:00 AM"
-# - cron: "37 3 * * *"
-# fires ~09:07 AM IST (UTC-only, off-peak minute)
+```python
+EMAIL_SCHEDULE_IST = ["9:00 AM", "6:00 PM"]   # exact clock times
+TELEGRAM_INTERVAL_HOURS = 2                    # or fixed times, see config.py
 ```
 
-For a different timezone, look up its UTC offset and adjust `IST_OFFSET`
-at the top of the script.
+Every hourly check-in, `schedule.py` asks "is now within an hour of one of
+these?" and only sends when a configured slot is due — each slot fires at
+most once a day (tracked in `schedule_state.json`), no matter how many
+times the hourly check-in runs past it. **Change a time by editing
+`config.py` — no workflow file, no cron, no UTC math, ever.**
 
-Add one `- cron:` line per trigger you want — the template ships with two
-as an example. Each fires independently, so N cron lines means N
-emails/day.
+<details>
+<summary>Why the workflow file still needs one cron line at all</summary>
+
+GitHub's `schedule:` trigger is evaluated by GitHub's own scheduler
+*before* `main.py` ever runs — it has to already know when to wake up a
+runner, so it can't ask your Python code "what time should I run at?"
+That's why one fixed, frequent check-in (hourly) stays in the workflow
+file; `config.py` + `schedule.py` decide what that check-in actually
+*does* each time, entirely in Python.
+
+The hourly interval is deliberately off `:00`/`:30` — GitHub's scheduler
+gets congested at those popular marks, which has been known to delay a
+run by 3+ hours. If you want a *tighter* check interval (e.g. every 15
+min, for closer-to-exact Telegram timing), edit the `cron:` line and keep
+the new minute off `:00`/`:15`/`:30`/`:45` for the same reason —
+`ist_to_cron.py` can help pick one.
+
+</details>
 
 State (`seen_jobs.json`) persists between runs via `actions/cache`, not by
 committing it to the repo, so your job history doesn't clutter git log.
@@ -155,8 +169,8 @@ shows your current mode.
 
 | Command | Mode | Behavior |
 |---|---|---|
-| `/scheduled` (default) | Scheduled | Full digest only at the official run times. |
-| `/queue` | Queue | An early "added to queue" ping the moment a job is found, **plus** the full entry at the next official run. |
+| `/scheduled` (default) | Scheduled | Full digest only when `TELEGRAM_INTERVAL_HOURS`/`TELEGRAM_SCHEDULE_IST` (in `config.py`) says it's due. |
+| `/queue` | Queue | An early "added to queue" ping the moment a job is found, **plus** the full entry at the next scheduled fire. |
 | `/instant` | Instant | The full entry immediately, whenever a job is first found — never repeated later. |
 
 Entirely optional: leave `TELEGRAM_BOT_TOKEN` unset and `telegram_bot.py`
@@ -165,25 +179,24 @@ no-ops everywhere it's called — the email digest works exactly as before.
 <details>
 <summary>How "instant" actually works, and other details</summary>
 
-**No true push.** Queue and instant modes only do anything if you enable
-the optional hourly `- cron: "0 * * * *"` trigger in the workflow file
-(commented out by default alongside the rest of the schedule). That
-trigger fetches jobs and pings instant/queue subscribers, but never sends
-email and never runs the official digest — that's still only your
-official cron times. So "instant" really means "within an hour" (or
-whatever interval you set that trigger to), not real-time push.
-Scheduled-mode subscribers are completely unaffected by it either way.
+**No true push.** Every hourly check-in fetches jobs and pings
+instant/queue subscribers regardless of whether email or the scheduled
+Telegram digest is due this run. So "instant" really means "within an
+hour" (the check-in interval), not real-time push. Scheduled-mode
+subscribers are completely unaffected by runs where their own schedule
+isn't due.
 
-**Why an extra hourly run can't cause an official run to miss anything:**
-a job is marked "seen" in `seen_jobs.json` the first time *any* run —
-hourly or official — fetches it, so it only ever counts as "new" once,
-system-wide. To stop that from meaning "an hourly run steals a job from
-scheduled-mode subscribers," every newly-found job is *also* appended to
-`pending_jobs.json` regardless of which run found it or who it's for. The
-official run flushes and clears that whole accumulated list (to email, and
-to scheduled/queue Telegram subscribers) rather than just its own run's
-finds. Instant-mode delivery, by contrast, only ever uses that specific
-run's own finds, so instant subscribers never see a repeat.
+**Why a check-in run can't cause a scheduled fire to miss anything:** a
+job is marked "seen" in `seen_jobs.json` the first time *any* run fetches
+it, so it only ever counts as "new" once, system-wide. Every newly-found
+job is *also* appended to `pending_telegram_jobs.json` regardless of
+whether Telegram's schedule is due this exact run. When it does become
+due, that whole accumulated list gets flushed and cleared — so a
+scheduled-mode subscriber still gets everything found since the last
+fire, not just this run's own finds. Instant-mode delivery, by contrast,
+only ever uses that specific run's own finds, so instant subscribers
+never see a repeat. (Email works the same way, via its own separate
+`pending_email_jobs.json` — the two schedules are fully independent.)
 
 **Important limit:** categories and `/skills` both only *narrow* the
 digest — they can't widen it. Every job still has to clear the global
@@ -191,11 +204,16 @@ digest — they can't widen it. Every job still has to clear the global
 category or `/skills` keyword surfaces a posting only if it also already
 scored high enough on your `PRIMARY_SKILLS`/`SECONDARY_SKILLS`/`AI_SKILLS`.
 
-**Timing:** same model as the email digest — no webhook, no always-on
-server. `telegram_bot.poll_commands()` checks for new Telegram messages
-once per run, so a `/preferences`, `/skills`, or mode change takes effect
-on the next scheduled (or hourly, if enabled) run — or immediately if you
-manually trigger the workflow right after messaging the bot.
+**Timing:** no webhook, no always-on server. `telegram_bot.poll_commands()`
+checks for new Telegram messages once per run, so a `/preferences`,
+`/skills`, or mode change takes effect on the next hourly check-in — or
+immediately if you manually trigger the workflow right after messaging
+the bot.
+
+**State:** `telegram_state.json`, `pending_email_jobs.json`,
+`pending_telegram_jobs.json`, and `schedule_state.json` (which configured
+times have already fired today) persist between runs the same way
+`seen_jobs.json` does — via `actions/cache`, gitignored, never committed.
 
 </details>
 
@@ -233,16 +251,21 @@ page, `sources.py`'s existing fetchers are the pattern to follow — see
 ## Files
 
 - `config.py` — every setting you'd want to change: skills, experience
-  range, job type/location filters, sources, email settings, Telegram
-  categories
-- `ist_to_cron.py` — converts an IST time to an off-peak UTC `cron:` line
-  for the workflow file (see "Timezone handling")
+  range, job type/location filters, when things fire, sources, email
+  settings, Telegram categories
+- `schedule.py` — decides if "now" matches `config.py`'s
+  `EMAIL_SCHEDULE_IST`/`TELEGRAM_INTERVAL_HOURS` (or `TELEGRAM_SCHEDULE_IST`),
+  with per-day dedup so a slot fires at most once
+- `ist_to_cron.py` — helper for changing the workflow's own check-in
+  interval (rarely needed — see "Timezone handling")
 - `sources.py` — per-source fetchers (RemoteOK, We Work Remotely, Arbeitnow,
   Jobicy, Working Nomads, Himalayas, Internshala)
 - `skills.py` — shared word-boundary skill matching
-- `experience.py` — seniority/years-of-experience filter
-- `state.py` — seen-job id persistence and the pending-jobs accumulator
-  (`pending_jobs.json`) between official runs
+- `experience.py` — seniority/years-of-experience filter (reads
+  `config.MIN_YEARS`/`config.MAX_YEARS`)
+- `state.py` — seen-job id persistence and the pending-jobs accumulators
+  (`pending_email_jobs.json`, `pending_telegram_jobs.json`) between
+  scheduled fires
 - `notify.py` — digest formatting + SMTP send
 - `telegram_bot.py` — optional Telegram channel: command polling, category
   picker, notification-mode handling, digest formatting + send (all no-ops
