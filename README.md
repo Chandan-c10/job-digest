@@ -25,18 +25,30 @@ wired in, not just assumed to work.
    `config.py` (word-boundary matching, so short terms like "Git" don't
    false-positive on "Legit").
 3. `experience.py` drops postings with senior/lead/staff/director-type
-   titles, or that explicitly ask for more years of experience than
-   `experience.MAX_YEARS`.
-4. `state.py` remembers which postings you've already been shown
+   titles, or that ask for a years-of-experience outside
+   `config.MIN_YEARS`–`config.MAX_YEARS`.
+4. `main.py` also applies `config.JOB_TYPES` and `config.LOCATIONS` if
+   you've set them — both optional, both empty (no filtering) by default.
+5. `state.py` remembers which postings you've already been shown
    (`seen_jobs.json`), so you're never re-notified.
-5. `notify.py` emails you the digest via Gmail SMTP.
+6. `notify.py` emails you the digest via Gmail SMTP.
 
 ## Setup
 
+Everything you configure lives in **`config.py`** — one file, nothing to
+hunt for elsewhere:
+
 1. Fork/clone this repo.
-2. Edit `config.py`: set `PRIMARY_SKILLS` / `SECONDARY_SKILLS` / `AI_SKILLS`
-   to match what you're targeting, and adjust `MIN_SKILL_MATCHES`.
-3. Edit `experience.py`'s `MAX_YEARS` to your experience level.
+2. Edit `config.py`:
+   - `PRIMARY_SKILLS` / `SECONDARY_SKILLS` / `AI_SKILLS` — your skills,
+     and `MIN_SKILL_MATCHES` — how many hits a posting needs to count.
+   - `MIN_YEARS` / `MAX_YEARS` — your experience range.
+   - `JOB_TYPES` / `LOCATIONS` — optional; leave empty to skip. Useful for
+     Internshala's on-site listings since most other sources are
+     remote-only anyway.
+3. If you skip step 2 entirely (all skill lists left empty), the script
+   fails loudly with a clear error instead of silently finding nothing —
+   go back and fill in at least one skill list.
 4. Create a Gmail App Password for whichever account will send the digest
    (Google Account → Security → 2-Step Verification → App Passwords).
 5. Run it locally to test:
@@ -202,7 +214,9 @@ page, `sources.py`'s existing fetchers are the pattern to follow — see
 
 ## Files
 
-- `config.py` — skills, sources, email settings, Telegram categories
+- `config.py` — every setting you'd want to change: skills, experience
+  range, job type/location filters, sources, email settings, Telegram
+  categories
 - `sources.py` — per-source fetchers (RemoteOK, We Work Remotely, Arbeitnow,
   Jobicy, Working Nomads, Himalayas, Internshala)
 - `skills.py` — shared word-boundary skill matching

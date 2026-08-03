@@ -1,11 +1,10 @@
-"""Filters out postings that don't fit a 1-2 year experience level:
-senior/lead/staff-type titles, and postings that explicitly ask for more
-years of experience than that.
+"""Filters out postings outside [config.MIN_YEARS, config.MAX_YEARS]:
+senior/lead/staff-type titles, and postings that explicitly ask for a
+years-of-experience range outside that window.
 """
 import re
 
-#  ADD your experience Here --\/--
-MAX_YEARS = 0
+import config
 
 SENIOR_TITLE_PATTERN = re.compile(
     r"\b(senior|sr\.?|staff|principal|lead|director|architect|head of|manager|vp|vice president)\b",
@@ -27,6 +26,6 @@ def is_appropriate_level(job):
     text = job.get("text_for_match", "")
     for m in YEARS_PATTERN.finditer(text):
         low = int(m.group(1) or m.group(3))
-        if low > MAX_YEARS:
+        if low > config.MAX_YEARS or low < config.MIN_YEARS:
             return False
     return True

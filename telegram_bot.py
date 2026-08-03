@@ -216,12 +216,16 @@ def poll_commands():
     """Apply any Telegram messages sent since the last run. No-op if the
     bot token isn't configured."""
     if not config.TELEGRAM_BOT_TOKEN:
+        print("Telegram: TELEGRAM_BOT_TOKEN not set, skipping.")
         return
     state = load_state()
     result = _api("getUpdates", offset=state["update_offset"], timeout=0)
     if not result or not result.get("ok"):
+        print(f"Telegram: getUpdates returned an unexpected response: {result}")
         return
-    for update in result["result"]:
+    updates = result["result"]
+    print(f"Telegram: {len(updates)} update(s) to process, {len(state['subscribers'])} known subscriber(s).")
+    for update in updates:
         state["update_offset"] = update["update_id"] + 1
         if "message" in update:
             _handle_message(state, update["message"]["chat"]["id"], update["message"].get("text", ""))

@@ -10,8 +10,32 @@ import state
 import telegram_bot
 
 
+def _telegram_safe(label, fn, *args):
+    """Telegram is an optional second channel — a failure on its side (bad
+    token, a subscriber blocking the bot, a Telegram API hiccup) must never
+    take the email digest down with it."""
+    try:
+        fn(*args)
+    except Exception as exc:  # noqa: BLE001
+        print(f"Telegram: {label} failed ({exc}), continuing without it.")
+
+
+def _matches_any(terms, text):
+    """True if terms is empty (filter not in use) or text mentions at
+    least one of them."""
+    return not terms or any(skills.skill_in_text(t, text) for t in terms)
+
+
 def main():
-    telegram_bot.poll_commands()
+    if not (config.PRIMARY_SKILLS or config.SECONDARY_SKILLS or config.AI_SKILLS):
+        raise RuntimeError(
+            "No skills configured - PRIMARY_SKILLS, SECONDARY_SKILLS, and "
+            "AI_SKILLS in config.py are all empty, so no job could ever "
+            "match. Fill in at least one skill list before running (see "
+            "README.md 'Setup')."
+        )
+
+    _telegram_safe("poll_commands", telegram_bot.poll_commands)
 
     seen = state.load_seen(config.STATE_FILE)
     pending = state.load_pending(config.PENDING_JOBS_FILE)
@@ -22,6 +46,10 @@ def main():
         if job["id"] in seen:
             continue
         if not experience.is_appropriate_level(job):
+            continue
+        if not _matches_any(config.JOB_TYPES, job["text_for_match"]):
+            continue
+        if not _matches_any(config.LOCATIONS, job["text_for_match"]):
             continue
         hits = skills.matched_skills(job["text_for_match"])
         if len(hits) >= config.MIN_SKILL_MATCHES:
@@ -37,8 +65,8 @@ def main():
 
     # Instant-mode subscribers get this run's finds right away; queue-mode
     # subscribers get an early heads-up now and the full entry later.
-    telegram_bot.deliver_instant(new_jobs)
-    telegram_bot.ping_queue(new_jobs)
+    _telegram_safe("deliver_instant", telegram_bot.deliver_instant, new_jobs)
+    _telegram_safe("ping_queue", telegram_bot.ping_queue, new_jobs)
 
     # Accumulate for the next official run — this is what lets a frequent
     # discovery-only run exist without an official run ever missing a job
@@ -52,7 +80,7 @@ def main():
 
     # Official run: flush everything accumulated since the last one to
     # scheduled/queue Telegram subscribers and to email.
-    telegram_bot.deliver_scheduled(pending)
+    _telegram_safe("deliver_scheduled", telegram_bot.deliver_scheduled, pending)
 
     body = notify.format_digest(pending, errors)
     today = datetime.date.today().isoformat()

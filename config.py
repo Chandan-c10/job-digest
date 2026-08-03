@@ -1,28 +1,40 @@
 import os
 
-# Skill tiers, all matched (word-boundary, case-insensitive) against each
-# job's title + tags + description. A job is only included if it hits at
-# least MIN_SKILL_MATCHES skills total, counting across all three tiers.
+# Your skills, split into 3 tiers. A job needs MIN_SKILL_MATCHES hits
+# total (any tier) to count. Uncomment the examples below and edit them,
+# or write your own the same way.
 PRIMARY_SKILLS = [
-    #Example: 
-    # 
-    # "Java", "java script", "Node.ja", "DevOps", "AWS", "Linux", "Docker",
-    # "Terraform", "Git", "CI/CD", "Python", "Shell Scripting", "API", 
+    # "DevOps", "AWS", "Linux", "Docker", "Terraform", "Git", "CI/CD",
+    # "Python", "Java", "JavaScript", "Node.js", "API",
 ]
 
 SECONDARY_SKILLS = [
-    #Example: -- Rewrite/Edit the following lines of code using the same pattern. --
-    # 
     # "Cloud Engineering", "Site Reliability Engineering (SRE)",
-    # "Infrastructure as Code (IaC)","SDE",
+    # "Infrastructure as Code (IaC)", "SDE",
 ]
 
 AI_SKILLS = [
-    #Example: -- Rewrite/Edit the following lines of code using the same pattern. --
     # "GenAI", "RAG", "FastAPI", "OpenAI", "LLM",
 ]
 
 MIN_SKILL_MATCHES = 4
+
+# Postings asking for more than MAX_YEARS or less than MIN_YEARS are
+# skipped. Leave MIN_YEARS at 0 to allow any junior/fresher posting.
+MIN_YEARS = 0
+MAX_YEARS = 0
+
+# Optional. If set, a posting must mention at least one entry from each
+# non-empty list below (title/description). Leave a list empty to skip
+# that filter entirely - e.g. most sources are remote-only, but Internshala
+# includes on-site listings in specific cities, so LOCATIONS is useful there.
+JOB_TYPES = [
+    # "Full-time", "Internship", "Contract",
+]
+
+LOCATIONS = [
+    # "Remote", "Bangalore", "Delhi",
+]
 
 # Sources to poll. Each must exist in sources.py's SOURCE_FUNCS.
 SOURCES = [
@@ -56,31 +68,18 @@ IS_OFFICIAL_RUN = os.environ.get("TELEGRAM_OFFICIAL_RUN", "true").lower() != "fa
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_STATE_FILE = os.path.join(os.path.dirname(__file__), "telegram_state.json")
 
-# Categories a subscriber can pick from in the bot's /preferences menu, each
-# mapped to the skill names (from the tiers above) that count as a match for
-# that category. Keys are also what's stored in telegram_state.json.
+# Categories subscribers pick from in the bot's /preferences menu. Each key
+# maps to a list of skills (from the tiers above) that count as a match.
+# Uncomment the examples below and edit them, or write your own the same way.
 TELEGRAM_CATEGORIES = {
-    #Example: -- Rewrite/Edit the following lines of code using the same pattern. --
-    # 
-    # "devops": ["DevOps", "CI/CD", "Jenkins", "Git", "GitHub Actions", "Shell Scripting"],
+    # "devops": ["DevOps", "CI/CD", "Git"],
     # "cloud": ["AWS", "Cloud Engineering"],
-    # "k8s": ["Kubernetes", "Helm", "Docker"],
-    # "terraform": ["Terraform", "Infrastructure as Code (IaC)", "Ansible"],
     # "ai": ["GenAI", "RAG", "FastAPI", "OpenAI", "LLM"],
-    # "sre": ["Site Reliability Engineering (SRE)", "DevSecOps"],
-    # "backend": ["Python", "FastAPI"],
-    # "python": ["Python"],
 }
 
+# One display label per key above, e.g. "devops" -> "DevOps".
 TELEGRAM_CATEGORY_LABELS = {
-    # Example: -- Rewrite/Edit the following lines of code using the same pattern. --
-    # 
     # "devops": "DevOps",
     # "cloud": "Cloud",
-    # "k8s": "Kubernetes",
-    # "terraform": "Terraform / IaC",
     # "ai": "AI / GenAI",
-    # "sre": "SRE",
-    # "backend": "Backend",
-    # "python": "Python",
 }
