@@ -14,13 +14,9 @@ wired in, not just assumed to work.
 
 ## How it works
 
-1. `sources.py` fetches postings from eight sources: RemoteOK, We Work
-   Remotely (2 RSS categories), Arbeitnow, Jobicy, Working Nomads,
-   Himalayas — all public JSON APIs or RSS feeds, no login required — plus
-   Internshala, which has no API/RSS but is server-rendered, so it's
-   regex-parsed from the plain HTML instead. Several other well-known
-   Indian/global portals were tested and rejected: see "Why not more
-   sources?" below.
+1. `sources.py` fetches postings from 8 public sources (RemoteOK, We Work
+   Remotely, Arbeitnow, Jobicy, Working Nomads, Himalayas, Internshala) —
+   no login required for any of them.
 2. `skills.py` matches each posting's text against the skill tiers in
    `config.py` (word-boundary matching, so short terms like "Git" don't
    false-positive on "Legit").
@@ -84,23 +80,23 @@ commented out. To activate it on your fork:
 3. Commit and push. It'll run on GitHub's infrastructure — no need for your
    own machine to be on.
 
-> **No server needed — no external service at all.** This whole project
-> runs entirely on GitHub Actions: no VM to rent, no VPS to keep patched,
-> no cron host, no third-party scheduler to sign up for. Once the schedule
-> is uncommented, GitHub itself wakes up a fresh runner at each cron time,
-> checks out the repo, installs Python, runs `python3 main.py` exactly like
-> the local test command above, and tears the runner down when it's
-> done — nothing stays running, nothing to host or maintain.
->
-> **And it's free either way you fork it:**
-> - **Public repo:** unlimited Actions minutes, $0, no catch.
-> - **Private repo:** 2,000 free Actions minutes/month (GitHub's standard
->   free-tier allowance). Each run finishes in well under a minute, but
->   Actions bills a minimum of 1 minute per run regardless — with just the
->   2 official triggers that's ~60 min/month (3% of the budget); adding the
->   optional hourly Telegram instant/queue trigger brings it to ~780
->   min/month (about 39%). Either way, comfortably inside the free
->   allowance with room to spare, even running the hourly trigger 24/7.
+> **No server needed.** GitHub itself runs `python3 main.py` on your
+> schedule and throws the runner away when it's done — nothing to host,
+> nothing to maintain. Free on public repos; on private repos it uses a
+> small slice of GitHub's 2,000 free minutes/month (see below).
+
+<details>
+<summary>Exact free-tier minutes, if you're curious</summary>
+
+Public repos get unlimited Actions minutes, $0. Private repos get 2,000
+free minutes/month. Each run finishes in well under a minute, but Actions
+bills a minimum of 1 minute per run regardless — with just the 2 official
+triggers that's ~60 min/month (3% of the budget); adding the optional
+hourly Telegram instant/queue trigger brings it to ~780 min/month (about
+39%). Either way, comfortably inside the free allowance with room to
+spare, even running the hourly trigger 24/7.
+
+</details>
 
 ### Timezone handling
 
@@ -137,8 +133,8 @@ category picker so subscribers choose what they want without touching
 
 ### Notification modes
 
-Each subscriber has exactly one active mode, switched anytime — setting a
-new one replaces the old one:
+Pick one with `/scheduled` (default), `/queue`, or `/instant`. `/status`
+shows your current mode.
 
 | Command | Mode | Behavior |
 |---|---|---|
@@ -146,18 +142,20 @@ new one replaces the old one:
 | `/queue` | Queue | An early "added to queue" ping the moment a job is found, **plus** the full entry at the next official run. |
 | `/instant` | Instant | The full entry immediately, whenever a job is first found — never repeated later. |
 
-`/status` shows the active mode along with categories, custom skills, and
-pause state.
+Entirely optional: leave `TELEGRAM_BOT_TOKEN` unset and `telegram_bot.py`
+no-ops everywhere it's called — the email digest works exactly as before.
 
-**How "instant" actually works — no server, so no true push.** Queue and
-instant modes only do anything if you enable the optional hourly
-`- cron: "0 * * * *"` trigger in the workflow file (commented out by
-default alongside the rest of the schedule). That trigger fetches jobs and
-pings instant/queue subscribers, but never sends email and never runs the
-official digest — that's still only your official cron times. So
-"instant" really means "within an hour" (or whatever interval you set that
-trigger to), not real-time push. Scheduled-mode subscribers are completely
-unaffected by it either way.
+<details>
+<summary>How "instant" actually works, and other details</summary>
+
+**No true push.** Queue and instant modes only do anything if you enable
+the optional hourly `- cron: "0 * * * *"` trigger in the workflow file
+(commented out by default alongside the rest of the schedule). That
+trigger fetches jobs and pings instant/queue subscribers, but never sends
+email and never runs the official digest — that's still only your
+official cron times. So "instant" really means "within an hour" (or
+whatever interval you set that trigger to), not real-time push.
+Scheduled-mode subscribers are completely unaffected by it either way.
 
 **Why an extra hourly run can't cause an official run to miss anything:**
 a job is marked "seen" in `seen_jobs.json` the first time *any* run —
@@ -172,13 +170,9 @@ run's own finds, so instant subscribers never see a repeat.
 
 **Important limit:** categories and `/skills` both only *narrow* the
 digest — they can't widen it. Every job still has to clear the global
-`MIN_SKILL_MATCHES`-across-the-tiers filter in `main.py` first (that's
-what builds the list Telegram ever sees). So a category or `/skills`
-keyword surfaces a posting only if it also already scored high enough on
-your `PRIMARY_SKILLS`/`SECONDARY_SKILLS`/`AI_SKILLS`. Making this fully
-independent per subscriber would mean moving that filter to run
-per-subscriber against every fetched job — a bigger change, not
-implemented here.
+`MIN_SKILL_MATCHES`-across-the-tiers filter in `main.py` first. So a
+category or `/skills` keyword surfaces a posting only if it also already
+scored high enough on your `PRIMARY_SKILLS`/`SECONDARY_SKILLS`/`AI_SKILLS`.
 
 **Timing:** same model as the email digest — no webhook, no always-on
 server. `telegram_bot.poll_commands()` checks for new Telegram messages
@@ -186,10 +180,15 @@ once per run, so a `/preferences`, `/skills`, or mode change takes effect
 on the next scheduled (or hourly, if enabled) run — or immediately if you
 manually trigger the workflow right after messaging the bot.
 
-Entirely optional: leave `TELEGRAM_BOT_TOKEN` unset and `telegram_bot.py`
-no-ops everywhere it's called — the email digest works exactly as before.
+</details>
 
 ## Why not more sources?
+
+LinkedIn, Naukri, Indeed, Glassdoor, and a handful of others were tested
+and rejected (blocked, JS-only, or too fragile to scrape reliably).
+
+<details>
+<summary>Full list of what was tried and why it didn't make the cut</summary>
 
 Every candidate below was actually tested live (real HTTP request, checked
 the response) before being accepted or rejected — not assumed either way:
@@ -211,6 +210,8 @@ seconds on a free GitHub Actions runner. If you want to add one of these
 anyway, or know of another source with a real public API/RSS/server-rendered
 page, `sources.py`'s existing fetchers are the pattern to follow — see
 `fetch_internshala()` for how to regex-parse an HTML-only source.
+
+</details>
 
 ## Files
 
