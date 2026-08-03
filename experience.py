@@ -4,7 +4,8 @@ years of experience than that.
 """
 import re
 
-MAX_YEARS = 1
+#  ADD your experience Here --\/--
+MAX_YEARS = 0
 
 SENIOR_TITLE_PATTERN = re.compile(
     r"\b(senior|sr\.?|staff|principal|lead|director|architect|head of|manager|vp|vice president)\b",
