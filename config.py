@@ -4,18 +4,22 @@ import os
 # job's title + tags + description. A job is only included if it hits at
 # least MIN_SKILL_MATCHES skills total, counting across all three tiers.
 PRIMARY_SKILLS = [
-    "DevOps", "AWS", "Linux", "Docker", "Kubernetes", "Jenkins",
-    "Terraform", "Git", "CI/CD", "Python", "Shell Scripting",
+    #Example: 
+    # 
+    # "Java", "java script", "Node.ja", "DevOps", "AWS", "Linux", "Docker",
+    # "Terraform", "Git", "CI/CD", "Python", "Shell Scripting", "API", 
 ]
 
 SECONDARY_SKILLS = [
-    "DevSecOps", "Ansible", "Helm", "GitHub Actions", "SonarQube", "Trivy",
-    "Cloud Engineering", "Site Reliability Engineering (SRE)",
-    "Infrastructure as Code (IaC)",
+    #Example: -- Rewrite/Edit the following lines of code using the same pattern. --
+    # 
+    # "Cloud Engineering", "Site Reliability Engineering (SRE)",
+    # "Infrastructure as Code (IaC)","SDE",
 ]
 
 AI_SKILLS = [
-    "GenAI", "RAG", "FastAPI", "OpenAI", "LLM",
+    #Example: -- Rewrite/Edit the following lines of code using the same pattern. --
+    # "GenAI", "RAG", "FastAPI", "OpenAI", "LLM",
 ]
 
 MIN_SKILL_MATCHES = 4
@@ -56,23 +60,27 @@ TELEGRAM_STATE_FILE = os.path.join(os.path.dirname(__file__), "telegram_state.js
 # mapped to the skill names (from the tiers above) that count as a match for
 # that category. Keys are also what's stored in telegram_state.json.
 TELEGRAM_CATEGORIES = {
-    "devops": ["DevOps", "CI/CD", "Jenkins", "Git", "GitHub Actions", "Shell Scripting"],
-    "cloud": ["AWS", "Cloud Engineering"],
-    "k8s": ["Kubernetes", "Helm", "Docker"],
-    "terraform": ["Terraform", "Infrastructure as Code (IaC)", "Ansible"],
-    "ai": ["GenAI", "RAG", "FastAPI", "OpenAI", "LLM"],
-    "sre": ["Site Reliability Engineering (SRE)", "DevSecOps"],
-    "backend": ["Python", "FastAPI"],
-    "python": ["Python"],
+    #Example: -- Rewrite/Edit the following lines of code using the same pattern. --
+    # 
+    # "devops": ["DevOps", "CI/CD", "Jenkins", "Git", "GitHub Actions", "Shell Scripting"],
+    # "cloud": ["AWS", "Cloud Engineering"],
+    # "k8s": ["Kubernetes", "Helm", "Docker"],
+    # "terraform": ["Terraform", "Infrastructure as Code (IaC)", "Ansible"],
+    # "ai": ["GenAI", "RAG", "FastAPI", "OpenAI", "LLM"],
+    # "sre": ["Site Reliability Engineering (SRE)", "DevSecOps"],
+    # "backend": ["Python", "FastAPI"],
+    # "python": ["Python"],
 }
 
 TELEGRAM_CATEGORY_LABELS = {
-    "devops": "DevOps",
-    "cloud": "Cloud",
-    "k8s": "Kubernetes",
-    "terraform": "Terraform / IaC",
-    "ai": "AI / GenAI",
-    "sre": "SRE",
-    "backend": "Backend",
-    "python": "Python",
+    # Example: -- Rewrite/Edit the following lines of code using the same pattern. --
+    # 
+    # "devops": "DevOps",
+    # "cloud": "Cloud",
+    # "k8s": "Kubernetes",
+    # "terraform": "Terraform / IaC",
+    # "ai": "AI / GenAI",
+    # "sre": "SRE",
+    # "backend": "Backend",
+    # "python": "Python",
 }
