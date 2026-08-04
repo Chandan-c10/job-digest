@@ -1,6 +1,6 @@
 """Shared skill-matching: word-boundary regex matching against job text,
-used both for filtering the digest (main.py) and resume tailoring
-(resume/tailor.py).
+used to filter the digest (main.py) and for job-type/location filtering
+(main.py's _matches_any).
 """
 import re
 
